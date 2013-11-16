@@ -37,6 +37,10 @@ local function nilOps( op1, op2 )
     return op1 or op2;
 end
 
+local function nilLen()
+    return 0;
+end
+
 -- ignore nil operation
 local function ignoreNilOps( ignore )
     local meta = {};
@@ -54,6 +58,7 @@ local function ignoreNilOps( ignore )
         meta.__mul = nilOps;
         meta.__div = nilOps;
         meta.__mod = nilOps;
+        meta.__len = nilLen;
         debug.setmetatable( nil, meta );
     else
         debug.setmetatable( nil, meta );
