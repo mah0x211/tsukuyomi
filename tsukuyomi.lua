@@ -427,6 +427,7 @@ local function slocInsert( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
+            ctx.insertions[ string.match( token[1], '([^\'].+[^\'])' ) ] = true;
             table.insert( 
                 ctx.code, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
@@ -580,6 +581,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
         length = string.len( txt ),
         code = {},
         local_decl = {},
+        insertions = {},
         tag_decl = {
             {
                 lineno = -1,
@@ -593,7 +595,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
             }
         }
     };
-    local script, err;
+    local script, err, insertions;
     
     ctx.code[1] = ctx.tag_decl[1].token;
     ctx.code[2] = ctx.tag_decl[2].token;
@@ -609,10 +611,11 @@ local function tsukuyomi_read( t, label, txt, srcmap )
                 script = script,
                 srcmap = srcmap and ctx.tag_decl or nil
             };
+            insertions = ctx.insertions;
         end
     end
     
-    return err;
+    return err, insertions;
 end
 
 return {
