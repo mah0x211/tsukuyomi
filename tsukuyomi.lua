@@ -217,16 +217,14 @@ local function findTag( ctx )
         -- create tag struct
         else
             tag.tail = tail;
-            -- remove \n
-            tag.token = string.gsub( txt:sub( head, tail ), '(\n+)', '' );
             -- trim /^\s|\s$/g
-            word = string.match( 
+            tag.token = string.match( 
                 -- remove \n
                 string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
                 '([^%s].+[^%s])'
             );
             -- separate NAME, SP, EXPR
-            tag.name, word, tag.expr = string.match( word, '^(%g+)(%s*)(.*)' );
+            tag.name, word, tag.expr = string.match( tag.token, '^(%g+)(%s*)(.*)' );
             -- set nil to empty
             if tag.expr == '' then
                 tag.expr = nil;
