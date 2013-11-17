@@ -114,22 +114,23 @@ local function linepos( src, head, tail )
 end
 
 -- generate error string
-local function errstr( tag, msg )
-    return '[line:' .. tag.lineno .. ':' .. tag.pos .. '] ' .. 
+local function errstr( tag, msg, label )
+    return '[line:' .. tag.lineno .. ':' .. tag.pos .. '' .. 
+            ( label and ( ':' .. label ) or '' ) .. '] ' .. 
             ( msg or '' ) .. 
             ' ::' .. tag.token .. '::';
 end
 
 
 -- generate error string with source mapping table
-local function errmap( srcmap, err )
+local function errmap( srcmap, err, label )
     local idx, msg;
     
     -- find error position
     idx, msg = string.match( err, ':(%d+):(.*)' );
     if idx then
         idx = tonumber( idx );
-        return errstr( srcmap[idx], msg );
+        return errstr( srcmap[idx], msg, label );
     end
     
     return err;
@@ -538,7 +539,7 @@ function tsukuyomi:recite( label, ignoreNil, data )
         end
         
         if not success and page.srcmap then
-            val = errmap( page.srcmap, val );
+            val = errmap( page.srcmap, val, label );
         end
     else
         val = '[' .. label .. ' not found]';
