@@ -351,6 +351,7 @@ local function slocThen( ctx, tag )
     local token, len, err = analyze( ctx, tag );
     
     if not err then
+        ctx.block_stack:push( tag );
         table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' then' );
     end
     
@@ -362,18 +363,35 @@ local function slocDo( ctx, tag )
     local token, len, err = analyze( ctx, tag );
     
     if not err then
+        ctx.block_stack:push( tag );
         table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' do' );
     end
     
     return err;
 end
 
--- none: else, end
-local function slocNone( ctx, tag )
+-- else
+local function slocElse( ctx, tag )
     local err = tag.expr and errstr( tag, 'invalid arguments' );
     
     if not err then
         table.insert( ctx.code, tag.name );
+    end
+    
+    return err;
+end
+
+-- end
+local function slocEnd( ctx, tag )
+    local err = tag.expr and errstr( tag, 'invalid arguments' );
+    
+    if not err then
+        if #ctx.block_stack < 1 then
+            err = errstr( tag, 'invalid statement' );
+        else
+            ctx.block_stack:pop();
+            table.insert( ctx.code, tag.name );
+        end
     end
     
     return err;
@@ -446,11 +464,11 @@ end
 local SLOC = {};
 SLOC['if'] = slocThen;
 SLOC['elseif'] = slocThen;
-SLOC['else'] = slocNone;
+SLOC['else'] = slocElse;
 SLOC['for'] = slocDo;
 SLOC['while'] = slocDo;
 SLOC['break'] = slocNone;
-SLOC['end'] = slocNone;
+SLOC['end'] = slocEnd;
 SLOC['goto'] = slocGoto;
 SLOC['label'] = slocLabel;
 -- custom tags
@@ -507,6 +525,11 @@ local function parse( ctx )
     end
     
     ::DONE::
+    if not err then
+        if #ctx.block_stack then
+            err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
+        end
+    end
     return err;
 end
 
@@ -590,6 +613,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
         code = {},
         local_decl = {},
         insertions = {},
+        block_stack = Stack.new(),
         tag_decl = {
             {
                 lineno = -1,
