@@ -30,7 +30,6 @@ PRIVATE_IDEN['_G'] = true;
 PRIVATE_IDEN['__TSUKUYOMI__'] = true;
 PRIVATE_IDEN['__RES__'] = true;
 PRIVATE_IDEN['__DATA__'] = true;
-PRIVATE_IDEN['__IGNORE_NILOPS__'] = true;
 
 -- change nil metatable
 local function nilOps( op1, op2 )
@@ -435,7 +434,7 @@ local function slocInsert( ctx, tag )
                 ctx.code, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
                 token[1] .. 
-                ', __DATA__, __IGNORE_NILOPS__);'
+                ', false, __DATA__ );'
             );
         end
     end
@@ -518,16 +517,21 @@ local tsukuyomi = {};
 function tsukuyomi:recite( label, ignoreNil, data )
     local page = self.pages[label];
     local res = {};
-    local co, success, val;
+    local success = true;
+    local val;
     
     if page then
+        -- invoke script by coroutine
+        local co;
+        
         -- enable ignore nil operation switch
         if ignoreNil then
             ignoreNilOps( true );
         end
-        -- invoke script by coroutine
+        
         co = coroutine.create( page.script );
-        success, val = coroutine.resume( co, self, res, data or {}, ignoreNil );
+        success, val = coroutine.resume( co, self, res, data or {} );
+        
         -- disable ignore nil operation switch
         if ignoreNil then
             ignoreNilOps( false );
@@ -589,7 +593,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
             {
                 lineno = -1,
                 pos = 0,
-                token = 'return function( __TSUKUYOMI__, __RES__, __DATA__, __IGNORE_NILOPS__ )'
+                token = 'return function( __TSUKUYOMI__, __RES__, __DATA__ )'
             },
             {
                 lineno = -1,
