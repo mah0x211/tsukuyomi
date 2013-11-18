@@ -124,10 +124,9 @@ end
 
 -- generate error string with source mapping table
 local function errmap( srcmap, err, label )
-    local idx, msg;
-    
     -- find error position
-    idx, msg = string.match( err, ':(%d+):(.*)' );
+    local idx, msg = string.match( err, ':(%d+):(.*)' );
+    
     if idx then
         idx = tonumber( idx );
         return errstr( srcmap[idx], msg, label );
@@ -526,7 +525,7 @@ local function parse( ctx )
     
     ::DONE::
     if not err then
-        if #ctx.block_stack then
+        if #ctx.block_stack > 0 then
             err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
         end
     end
