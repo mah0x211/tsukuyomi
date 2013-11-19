@@ -165,7 +165,7 @@ local function compile( ctx, env )
         script = script();
     end
     
-    return script, err;
+    return err, script;
 end
 
 -- tag parser
@@ -275,7 +275,7 @@ local function analyze( ctx, tag )
             if state.prev ~= '.' then
                 -- private ident
                 if PRIVATE_IDEN[v] then
-                    return nil, nil, errstr( tag, 'cannot access to private variable:' .. v );
+                    return errstr( tag, 'cannot access to private variable:' .. v );
                 -- to declare to local if identifier does not exists at environment
                 elseif not ctx.env[v] then
                     ctx.local_decl[v] = true;
@@ -315,7 +315,7 @@ local function analyze( ctx, tag )
         idx = idx + 1;
     end
     
-    return token, idx - 1;
+    return nil, token, idx - 1;
 end
 
 -- generate source lines of code
@@ -347,7 +347,7 @@ end
 
 -- then: if, elseif
 local function slocThen( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         ctx.block_stack:push( tag );
@@ -359,7 +359,7 @@ end
 
 -- do: for, while
 local function slocDo( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         ctx.block_stack:push( tag );
@@ -398,7 +398,7 @@ end
 
 -- goto
 local function slocGoto( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         if len ~= 1 then
@@ -413,7 +413,7 @@ end
 
 -- label
 local function slocLabel( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         if len ~= 1 then
@@ -428,7 +428,7 @@ end
 
 -- put
 local function slocPut( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         table.insert( 
@@ -441,7 +441,7 @@ end
 
 -- insert
 local function slocInsert( ctx, tag )
-    local token, len, err = analyze( ctx, tag );
+    local err, token, len = analyze( ctx, tag );
     
     if not err then
         if len ~= 1 then
@@ -529,6 +529,7 @@ local function parse( ctx )
             err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
         end
     end
+    
     return err;
 end
 
@@ -635,7 +636,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
     err = parse( ctx );
     if not err then
         -- compile context
-        script, err = compile( ctx, t.env );
+        err, script = compile( ctx, t.env );
         if not err then
             -- add page
             t.pages[label] = {
