@@ -29,23 +29,28 @@ local sandbox = _G;
 local views = tsukuyomi.new( sandbox );
 local srcmap = true;
 local ignoreNilOps = true;
-local res;
+local err, insertions, res, success;
 
 -- read page_hello
-res = tsukuyomi.read( views, 'hello', [[
+err ,insertions = tsukuyomi.read( views, 'hello', [[
 Hello <?insert "world" ?>
 ]], srcmap );
-if res then
-    error( res );
+if err then
+    error( err );
 end
 -- read page_world
-res = tsukuyomi.read( views, 'world', [[
+err, insertions = tsukuyomi.read( views, 'world', [[
 World!
 ]], srcmap );
-if res then
-    error( res );
+if err then
+    error( err );
 end
 
 -- render
-print( views:recite( 'hello', ignoreNilOps, {} ) );
-print( views:recite( 'world', ignoreNilOps, {} ) );
+res, success = views:recite( 'hello', ignoreNilOps, {} );
+if not success then
+    error( res );
+else
+    print( res );
+end
+--print( views:recite( 'world', ignoreNilOps, {} ) );
