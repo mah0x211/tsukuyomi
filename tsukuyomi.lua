@@ -463,6 +463,17 @@ local function slocInsert( ctx, tag )
     return err;
 end
 
+-- code
+local function slocCode( ctx, tag )
+    local err, token, len = analyze( ctx, tag );
+    
+    if not err then
+        table.insert( ctx.code, table.concat( token ) .. ';' );
+    end
+    
+    return err;
+end
+
 local SLOC = {};
 SLOC['if'] = slocThen;
 SLOC['elseif'] = slocThen;
@@ -476,6 +487,7 @@ SLOC['label'] = slocLabel;
 -- custom tags
 SLOC['put'] = slocPut;
 SLOC['insert'] = slocInsert;
+SLOC['code'] = slocCode;
 
 -- read template context
 local function parse( ctx )
