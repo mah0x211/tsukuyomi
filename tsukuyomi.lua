@@ -303,6 +303,9 @@ local function analyze( ctx, tag )
                     return errstr( tag, 'invalid keyword: ' .. v );
                 end
                 v = ' ' .. v .. ' ';
+            -- disallow termination symbol
+            elseif k == ';' then
+                return errstr( tag, 'invalid syntax: ' .. v );
             elseif k == '=' or k == '..' then
                 v = ' ' .. v .. ' ';
             end
