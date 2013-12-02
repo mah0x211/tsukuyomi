@@ -300,7 +300,7 @@ local function analyze( ctx, tag )
             state.iden = false;
             if k == 'keyword' then
                 if not ACCEPT_KEYS[v] then
-                    return nil, nil, errstr( tag, 'invalid syntax' );
+                    return errstr( tag, 'invalid keyword: ' .. v );
                 end
                 v = ' ' .. v .. ' ';
             elseif k == '=' or k == '..' then
