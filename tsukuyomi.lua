@@ -260,8 +260,11 @@ local function analyze( ctx, tag )
     local k, v;
     
     for k,v in lexer.lua( tag.expr ) do
+        -- got critical error
+        if not v then
+            return errstr( tag, v );
         -- found string
-        if k == 'string' then
+        elseif k == 'string' then
             v = "'" .. v .. "'";
         -- found data variable prefix
         elseif k == '@' then
