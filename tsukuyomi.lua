@@ -262,7 +262,7 @@ local function analyze( ctx, tag )
     for k,v in lexer.lua( tag.expr ) do
         -- got critical error
         if not v then
-            return errstr( tag, v );
+            return errstr( tag, 'pl.lexer.lua error: ' .. k );
         -- found string
         elseif k == 'string' then
             v = "'" .. v .. "'";
