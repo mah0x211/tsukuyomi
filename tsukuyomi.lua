@@ -351,12 +351,23 @@ local function pushText( ctx, tail )
 
 end
 
--- then: if, elseif
-local function slocThen( ctx, tag )
+-- if
+local function slocIf( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
         ctx.block_stack:push( tag );
+        table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' then' );
+    end
+    
+    return err;
+end
+
+-- elseif
+local function slocElseif( ctx, tag )
+    local err, token, len = analyze( ctx, tag );
+    
+    if not err then
         table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' then' );
     end
     
@@ -478,8 +489,8 @@ local function slocCode( ctx, tag )
 end
 
 local SLOC = {};
-SLOC['if'] = slocThen;
-SLOC['elseif'] = slocThen;
+SLOC['if'] = slocIf;
+SLOC['elseif'] = slocElseif;
 SLOC['else'] = slocElse;
 SLOC['for'] = slocDo;
 SLOC['while'] = slocDo;
