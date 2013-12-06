@@ -116,9 +116,9 @@ end
 -- generate error string
 local function errstr( tag, msg, label )
     return '[line:' .. tag.lineno .. ':' .. tag.pos .. '' .. 
-            ( label and ( ':' .. label ) or '' ) .. '] ' .. 
+            ( label and ':' .. label or '' ) .. '] ' .. 
             ( msg or '' ) .. 
-            ' ::' .. tag.token .. '::';
+            ( tag.token and ' ::' .. tag.token .. '::' or '' );
 end
 
 
