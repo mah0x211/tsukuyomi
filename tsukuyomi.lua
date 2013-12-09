@@ -288,13 +288,11 @@ local function analyze( ctx, tag )
             end
         -- found open-bracket
         elseif k == '[' then
-            if state.iden then
-                -- save current state
-                stack:push( state );
-                state = {
-                    iden = false;
-                };
-            end
+            -- save current state
+            stack:push( state );
+            state = {
+                iden = false;
+            };
         -- found close-bracket
         elseif k == ']' then
             state = stack:pop();
