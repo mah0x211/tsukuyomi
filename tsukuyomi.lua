@@ -267,7 +267,7 @@ local function analyze( ctx, tag )
         elseif k == 'string' then
             v = "'" .. v .. "'";
         -- found data variable prefix
-        elseif k == '@' then
+        elseif k == '$' then
             token[idx] = '__DATA__.';
             state.prev = '.';
             state.iden = true;
