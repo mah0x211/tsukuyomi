@@ -268,8 +268,7 @@ local function analyze( ctx, tag )
             v = "'" .. v .. "'";
         -- found data variable prefix
         elseif k == '$' then
-            token[idx] = '__DATA__.';
-            state.prev = '.';
+            token[idx] = '__DATA__';
             state.iden = true;
             goto CONTINUE;
         -- found identifier
