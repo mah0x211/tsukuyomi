@@ -485,13 +485,24 @@ local function slocCode( ctx, tag )
     return err;
 end
 
+-- break
+local function slocBreak( ctx, tag )
+    local err = tag.expr and errstr( tag, 'invalid arguments' );
+    
+    if not err then
+        table.insert( ctx.code, tag.name .. ';' );
+    end
+    
+    return err;
+end
+
 local SLOC = {};
 SLOC['if'] = slocIf;
 SLOC['elseif'] = slocElseif;
 SLOC['else'] = slocElse;
 SLOC['for'] = slocDo;
 SLOC['while'] = slocDo;
-SLOC['break'] = slocNone;
+SLOC['break'] = slocBreak;
 SLOC['end'] = slocEnd;
 SLOC['goto'] = slocGoto;
 SLOC['label'] = slocLabel;
