@@ -466,7 +466,7 @@ local function slocInsert( ctx, tag )
                 ctx.code, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
                 token[1] .. 
-                ', false, __DATA__ );'
+                ', false, __DATA__, __LABEL__ );'
             );
         end
     end
@@ -575,34 +575,39 @@ end
 -- tsukuyomi instance methods(metatable)
 local tsukuyomi = {};
 
-function tsukuyomi:recite( label, ignoreNil, data )
-    local page = self.pages[label];
-    local res = {};
-    local success = true;
+function tsukuyomi:recite( label, ignoreNil, data, parent )
+    local success = false;
     local val;
     
-    if page then
-        -- invoke script by coroutine
-        local co;
-        
-        -- enable ignore nil operation switch
-        if ignoreNil then
-            ignoreNilOps( true );
-        end
-        
-        co = coroutine.create( page.script );
-        success, val = coroutine.resume( co, self, res, data or {} );
-        
-        -- disable ignore nil operation switch
-        if ignoreNil then
-            ignoreNilOps( false );
-        end
-        
-        if not success and page.srcmap then
-            val = errmap( page.srcmap, val, label );
-        end
+    if label == parent then
+        val = '[' .. label .. ': circular insertion disallowd]';
     else
-        val = '[' .. label .. ' not found]';
+        local page = self.pages[label];
+        local res = {};
+        
+        if page then
+            -- invoke script by coroutine
+            local co;
+            
+            -- enable ignore nil operation switch
+            if ignoreNil then
+                ignoreNilOps( true );
+            end
+            
+            co = coroutine.create( page.script );
+            success, val = coroutine.resume( co, self, res, data or {}, label );
+            
+            -- disable ignore nil operation switch
+            if ignoreNil then
+                ignoreNilOps( false );
+            end
+            
+            if not success and page.srcmap then
+                val = errmap( page.srcmap, val, label );
+            end
+        else
+            val = '[' .. label .. ' not found]';
+        end
     end
     
     return val, success;
@@ -655,7 +660,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
             {
                 lineno = -1,
                 pos = 0,
-                token = 'return function( __TSUKUYOMI__, __RES__, __DATA__ )'
+                token = 'return function( __TSUKUYOMI__, __RES__, __DATA__, __LABEL__ )'
             },
             {
                 lineno = -1,
