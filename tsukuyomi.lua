@@ -580,7 +580,7 @@ function tsukuyomi:recite( label, ignoreNil, data, parent )
     local val;
     
     if label == parent then
-        val = '[' .. label .. ': circular insertion disallowd]';
+        val = '[' .. label .. ': circular insertion disallowed]';
     else
         local page = self.pages[label];
         local res = {};
@@ -645,6 +645,13 @@ local function tsukuyomi_new( env )
     });
 end
 
+-- remove template context
+local function tsukuyomi_remove( t, label )
+    if t.pages[label] then
+        t.pages[label] = nil;
+    end
+end
+
 -- read template context
 local function tsukuyomi_read( t, label, txt, srcmap )
     local ctx = {
@@ -694,5 +701,6 @@ end
 
 return {
     new = tsukuyomi_new,
+    remove = tsukuyomi_remove,
     read = tsukuyomi_read
 };
