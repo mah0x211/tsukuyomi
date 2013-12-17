@@ -451,7 +451,7 @@ local function slocInsert( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            ctx.insertions[ string.match( token[1], '([^\'].+[^\'])' ) ] = true;
+            ctx.insertions[ string.match( token[1], '([^\'"].+[^\'"])' ) ] = true;
             table.insert( 
                 ctx.code, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
