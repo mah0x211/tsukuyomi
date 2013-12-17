@@ -11,7 +11,8 @@ description = {
     maintainer = "Masatoshi Teruya"
 }
 dependencies = {
-    "penlight"
+    "lpeg=0.10.2-1",
+    "lxsh"
 }
 build = {
     type = "builtin",

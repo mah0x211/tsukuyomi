@@ -24,7 +24,7 @@
     THE SOFTWARE.
 
 --]]
-local lexer = require('pl.lexer');
+local lxsh = require('lxsh');
 local PRIVATE_IDEN = {};
 PRIVATE_IDEN['_G'] = true;
 PRIVATE_IDEN['__TSUKUYOMI__'] = true;
@@ -241,9 +241,6 @@ end
 
 -- analyze
 local ACCEPT_KEYS = {};
-ACCEPT_KEYS['true'] = true;
-ACCEPT_KEYS['false'] = true;
-ACCEPT_KEYS['nil'] = true;
 ACCEPT_KEYS['and'] = true;
 ACCEPT_KEYS['or'] = true;
 ACCEPT_KEYS['not'] = true;
@@ -259,20 +256,17 @@ local function analyze( ctx, tag )
     local idx = 1;
     local k, v;
     
-    for k,v in lexer.lua( tag.expr ) do
-        -- got critical error
-        if not v then
-            return errstr( tag, 'pl.lexer.lua error: ' .. k );
-        -- found string
-        elseif k == 'string' then
-            v = "'" .. v .. "'";
-        -- found data variable prefix
-        elseif k == '$' then
-            token[idx] = '__DATA__';
-            state.iden = true;
-            goto CONTINUE;
+    for k, v in lxsh.lexers.lua.gmatch( tag.expr ) do
+        if k == 'error' then
+            -- found data variable prefix
+            if v == '$' then
+                token[idx] = '__DATA__';
+                state.iden = true;
+                goto CONTINUE;
+            end
+            return errstr( tag, 'unexpected symbol:' .. v );
         -- found identifier
-        elseif k == 'iden' then
+        elseif k == 'identifier' then
             -- not member fields
             if state.prev ~= '.' then
                 -- private ident
@@ -283,31 +277,27 @@ local function analyze( ctx, tag )
                     ctx.local_decl[v] = true;
                 end
                 state.iden = true;
-                v = ' ' .. v;
             end
         -- found open-bracket
-        elseif k == '[' then
+        elseif v == '[' then
             -- save current state
             stack:push( state );
             state = {
                 iden = false;
             };
         -- found close-bracket
-        elseif k == ']' then
+        elseif v == ']' then
             state = stack:pop();
         -- found not member operator
-        elseif k ~= '.' then
+        elseif v ~= '.' then
             state.iden = false;
             if k == 'keyword' then
                 if not ACCEPT_KEYS[v] then
                     return errstr( tag, 'invalid keyword: ' .. v );
                 end
-                v = ' ' .. v .. ' ';
             -- disallow termination symbol
-            elseif k == ';' then
+            elseif v == ';' then
                 return errstr( tag, 'invalid syntax: ' .. v );
-            elseif k == '=' or k == '..' then
-                v = ' ' .. v .. ' ';
             end
         end
         
