@@ -488,6 +488,33 @@ local function slocBreak( ctx, tag )
     return err;
 end
 
+-- custom command
+local function slocCustom( ctx, tag )
+    local err, token, len = analyze( ctx, tag );
+    
+    if not err then
+        local cmd = ctx.cmds[tag.name];
+        local expr = table.concat( token );
+        
+        -- invoke custom command and output result
+        if cmd.output then
+            table.insert( 
+                ctx.code, 
+                '__RES__[#__RES__+1] = __TSUKUYOMI__.cmds["' .. 
+                cmd.name .. '"].fn(' .. expr .. ');'
+            );
+        -- invoke custom command
+        else
+            table.insert( 
+                ctx.code, '__TSUKUYOMI__.cmds["' .. cmd.name .. '"].fn(' .. expr .. ');'
+            );
+        end
+    end
+    
+    return err;
+    
+end
+
 local SLOC = {};
 SLOC['if'] = slocIf;
 SLOC['elseif'] = slocElseif;
@@ -524,6 +551,11 @@ local function parse( ctx )
             
             -- get handler
             sloc = SLOC[tag.name];
+            -- check custom command list
+            if not sloc and ctx.cmds[tag.name] then
+                sloc = slocCustom;
+            end
+            
             if sloc then
                 table.insert( ctx.tag_decl, tag );
                 err = sloc( ctx, tag );
@@ -631,10 +663,42 @@ end
 local function tsukuyomi_new( env )
     return setmetatable({
         env = ( type( env ) == 'table' ) and env or _G,
+        cmds = {},
         pages = {}
     }, {
         __index = tsukuyomi
     });
+end
+
+
+local PREFIX_CMD = '$';
+-- set custom user command
+local function tsukuyomi_cmd_set( t, cmd, fn, output )
+    if type( cmd ) ~= 'string' then
+        error( 'invalid argument: cmd must be type of string' );
+    elseif type( fn ) ~= 'function' then
+        error( 'invalid argument: fn must be type of function' );
+    end
+    
+    -- set custom command prefix
+    cmd = PREFIX_CMD .. cmd;
+    if t.cmds[cmd] then
+        error( 'invalid argument: ' .. cmd .. ' already exists' );
+    -- set custom command
+    else
+        t.cmds[cmd] = {
+            name = cmd,
+            fn = fn,
+            output = output and true or false
+        };
+    end
+end
+
+-- unset custom user command
+local function tsukuyomi_cmd_unset( t, cmd )
+    if type( cmd ) == 'string' then
+        t.cmds[PREFIX_CMD .. cmd] = nil;
+    end
 end
 
 -- remove template context
@@ -648,6 +712,7 @@ end
 local function tsukuyomi_read( t, label, txt, srcmap )
     local ctx = {
         env = t.env or {},
+        cmds = t.cmds,
         caret = 1,
         txt = txt,
         length = string.len( txt ),
@@ -694,5 +759,7 @@ end
 return {
     new = tsukuyomi_new,
     remove = tsukuyomi_remove,
-    read = tsukuyomi_read
+    read = tsukuyomi_read,
+    setCmd = tsukuyomi_cmd_set,
+    unsetCmd = tsukuyomi_cmd_unset
 };
