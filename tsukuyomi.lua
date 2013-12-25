@@ -129,7 +129,9 @@ local function errmap( srcmap, err, label )
     
     if idx then
         idx = tonumber( idx );
-        return errstr( srcmap[idx], msg, label );
+        if srcmap[idx] then
+            return errstr( srcmap[idx], msg, label );
+        end
     end
     
     return err;
