@@ -171,6 +171,11 @@ local function compile( ctx, env )
 end
 
 -- tag parser
+local SYM_QUOT = {
+    ['\''] = true,
+    ['"'] = true
+};
+
 local function findTag( ctx )
     local txt = ctx.txt;
     local caret = ctx.caret;
@@ -192,13 +197,12 @@ local function findTag( ctx )
             -- search close bracket ?>:[0x3F][0x3E]
             while word ~= '' do
                 -- found quot: [", '] and not escape sequence: [\] at front
-                if ( word == '"' or word == '\'' ) and 
-                    txt:byte(tail-1) ~= 0x5C then
+                if SYM_QUOT[word] and txt:byte(tail-1) ~= 0x5C then
                     -- clear current quot if close quot
                     if quot == word then
                         quot = nil;
                     -- set current quot if not in quot
-                    else
+                    elseif not quot then
                         quot = word;
                     end
                 -- not in quot and found close bracket
