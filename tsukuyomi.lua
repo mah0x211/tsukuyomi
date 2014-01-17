@@ -274,7 +274,7 @@ local function analyze( ctx, tag )
         -- found identifier
         elseif k == 'identifier' then
             -- not member fields
-            if state.prev ~= '.' then
+            if state.prev ~= '.' and state.prev ~= ':' then
                 -- private ident
                 if PRIVATE_IDEN[v] then
                     return errstr( tag, 'cannot access to private variable:' .. v );
@@ -307,7 +307,7 @@ local function analyze( ctx, tag )
             end
         end
         
-        state.prev = k;
+        state.prev = v;
         token[idx] = v;
         
         ::CONTINUE::
