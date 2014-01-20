@@ -181,7 +181,7 @@ local function findTag( ctx )
     local caret = ctx.caret;
     local head, tail = string.find( txt, '<?', caret, true );
     local ignore = false;
-    local quot, tag, word, lineno, pos;
+    local quot, tag, word, lineno, pos, lbhead, lbtail, literal;
     
     while head do
         tail = tail + 1;
@@ -196,6 +196,22 @@ local function findTag( ctx )
             skipSP = false;
             -- search close bracket ?>:[0x3F][0x3E]
             while word ~= '' do
+                -- check literal-bracket(double-bracket)
+                if word == '[' then
+                    lbhead, lbtail = txt:find( '^%[=*%[', tail );
+                    -- found open literal-bracket
+                    if lbhead then
+                        -- find close literal-bracket
+                        literal = txt:sub( lbhead, lbtail ):gsub( '%[', '%]' );
+                        lbhead, lbtail = txt:find( literal, lbtail + 1, true );
+                        -- found
+                        if lbhead then
+                            tail = lbtail;
+                            goto NEXT_WORD;
+                        end
+                    end
+                end
+                
                 -- found quot: [", '] and not escape sequence: [\] at front
                 if SYM_QUOT[word] and txt:byte(tail-1) ~= 0x5C then
                     -- clear current quot if close quot
@@ -210,6 +226,8 @@ local function findTag( ctx )
                     tail = tail + 1;
                     break;
                 end
+                
+                ::NEXT_WORD::
                 tail = tail + 1;
                 word = txt:sub( tail, tail );
             end
