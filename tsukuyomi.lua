@@ -72,7 +72,7 @@ function Stack:push( arg )
     table.insert( self, arg );
 end
 
-function Stack:pop( arg )
+function Stack:pop()
     return table.remove( self );
 end
 
