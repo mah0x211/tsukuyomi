@@ -32,6 +32,10 @@ PRIVATE_IDEN['__RES__'] = true;
 PRIVATE_IDEN['__DATA__'] = true;
 
 -- change nil metatable
+local function nilIdx()
+    return nil;
+end
+
 local function nilOps( op1, op2 )
     return op1 or op2;
 end
@@ -45,12 +49,8 @@ local function ignoreNilOps( ignore )
     local meta = {};
     
     if ignore then
-        meta.__index = function()
-            return nil;
-        end
-        meta.__newindex = function()
-            return nil;
-        end
+        meta.__index = nilIdx;
+        meta.__newindex = nilIdx;
         meta.__concat = nilOps;
         meta.__add = nilOps;
         meta.__sub = nilOps;
