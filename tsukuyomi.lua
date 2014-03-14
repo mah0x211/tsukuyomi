@@ -44,25 +44,27 @@ local function nilLen()
     return 0;
 end
 
+local METATBL_NIL = {
+    __index = nilIdx,
+    __newindex = nilIdx,
+    __concat = nilOps,
+    __add = nilOps,
+    __sub = nilOps,
+    __mul = nilOps,
+    __div = nilOps,
+    __mod = nilOps,
+    __pow = nilOps,
+    __unm = nilOps,
+    __len = nilLen
+};
+local METATBL_EMPTY = {};
+
 -- ignore nil operation
 local function ignoreNilOps( ignore )
-    local meta = {};
-    
     if ignore then
-        meta.__index = nilIdx;
-        meta.__newindex = nilIdx;
-        meta.__concat = nilOps;
-        meta.__add = nilOps;
-        meta.__sub = nilOps;
-        meta.__mul = nilOps;
-        meta.__div = nilOps;
-        meta.__mod = nilOps;
-        meta.__pow = nilOps;
-        meta.__unm = nilOps;
-        meta.__len = nilLen;
-        debug.setmetatable( nil, meta );
+        debug.setmetatable( nil, METATBL_NIL );
     else
-        debug.setmetatable( nil, meta );
+        debug.setmetatable( nil, METATBL_EMPTY );
     end
 end
 
