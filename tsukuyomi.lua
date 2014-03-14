@@ -57,6 +57,8 @@ local function ignoreNilOps( ignore )
         meta.__mul = nilOps;
         meta.__div = nilOps;
         meta.__mod = nilOps;
+        meta.__pow = nilOps;
+        meta.__unm = nilOps;
         meta.__len = nilLen;
         debug.setmetatable( nil, meta );
     else
