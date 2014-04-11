@@ -345,6 +345,13 @@ VOIDTXT_TBL['\n'] = '\\n';
 VOIDTXT_TBL['\''] = '\\\'';
 VOIDTXT_TBL['\\'] = '\\\\';
 
+local function appendCode( ctx, code )
+    -- ignore source code if block_break is true.
+    if not ctx.block_break then
+        table.insert( ctx.code, code );
+    end
+end
+
 local function pushText( ctx, tail )
     -- void [\n, ', \]
     local voidtxt = string.gsub( 
@@ -360,9 +367,7 @@ local function pushText( ctx, tail )
         pos = pos
     });
     
-    table.insert( 
-        ctx.code, '__RES__[#__RES__+1] = \'' .. voidtxt .. '\';'
-    );
+    appendCode( ctx, '__RES__[#__RES__+1] = \'' .. voidtxt .. '\';' );
 
 end
 
@@ -372,7 +377,7 @@ local function slocIf( ctx, tag )
     
     if not err then
         ctx.block_stack:push( tag );
-        table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' then' );
+        appendCode( ctx, tag.name .. ' ' .. table.concat( token ) .. ' then' );
     end
     
     return err;
@@ -383,7 +388,7 @@ local function slocElseif( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' then' );
+        appendCode( ctx, tag.name .. ' ' .. table.concat( token ) .. ' then' );
     end
     
     return err;
@@ -395,7 +400,7 @@ local function slocDo( ctx, tag )
     
     if not err then
         ctx.block_stack:push( tag );
-        table.insert( ctx.code, tag.name .. ' ' .. table.concat( token ) .. ' do' );
+        appendCode( ctx, tag.name .. ' ' .. table.concat( token ) .. ' do' );
     end
     
     return err;
@@ -406,7 +411,7 @@ local function slocElse( ctx, tag )
     local err = tag.expr and errstr( tag, 'invalid arguments' );
     
     if not err then
-        table.insert( ctx.code, tag.name );
+        appendCode( ctx, tag.name );
     end
     
     return err;
@@ -421,7 +426,8 @@ local function slocEnd( ctx, tag )
             err = errstr( tag, 'invalid statement' );
         else
             ctx.block_stack:pop();
-            table.insert( ctx.code, tag.name );
+            ctx.block_break = false;
+            appendCode( ctx, tag.name );
         end
     end
     
@@ -436,7 +442,7 @@ local function slocGoto( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            table.insert( ctx.code, tag.name .. ' ' .. token[1] .. ';' );
+            appendCode( ctx, tag.name .. ' ' .. token[1] .. ';' );
         end
     end
     
@@ -451,7 +457,7 @@ local function slocLabel( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            table.insert( ctx.code, '::' .. token[1] .. '::' );
+            appendCode( ctx, '::' .. token[1] .. '::' );
         end
     end
     
@@ -463,8 +469,8 @@ local function slocPut( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        table.insert( 
-            ctx.code, '__RES__[#__RES__+1] = ' .. table.concat( token ) .. ';' 
+        appendCode( 
+            ctx, '__RES__[#__RES__+1] = ' .. table.concat( token ) .. ';' 
         );
     end
     
@@ -480,8 +486,8 @@ local function slocInsert( ctx, tag )
             err = errstr( tag, 'invalid arguments' );
         else
             ctx.insertions[ string.match( token[1], '([^\'"].+[^\'"])' ) ] = true;
-            table.insert( 
-                ctx.code, 
+            appendCode( 
+                ctx, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
                 token[1] .. 
                 ', false, __DATA__, __LABEL__ );'
@@ -497,7 +503,7 @@ local function slocCode( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        table.insert( ctx.code, table.concat( token ) .. ';' );
+        appendCode( ctx, table.concat( token ) .. ';' );
     end
     
     return err;
@@ -508,7 +514,8 @@ local function slocBreak( ctx, tag )
     local err = tag.expr and errstr( tag, 'invalid arguments' );
     
     if not err then
-        table.insert( ctx.code, tag.name .. ';' );
+        appendCode( ctx, tag.name .. ';' );
+        ctx.block_break = true;
     end
     
     return err;
@@ -524,15 +531,15 @@ local function slocCustom( ctx, tag )
         
         -- invoke custom command and output result
         if cmd.output then
-            table.insert( 
-                ctx.code, 
+            appendCode( 
+                ctx, 
                 '__RES__[#__RES__+1] = __TSUKUYOMI__.cmds["' .. 
                 cmd.name .. '"].fn(' .. expr .. ');'
             );
         -- invoke custom command
         else
-            table.insert( 
-                ctx.code, '__TSUKUYOMI__.cmds["' .. cmd.name .. '"].fn(' .. expr .. ');'
+            appendCode( 
+                ctx, '__TSUKUYOMI__.cmds["' .. cmd.name .. '"].fn(' .. expr .. ');'
             );
         end
     end
