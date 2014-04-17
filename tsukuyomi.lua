@@ -153,7 +153,7 @@ local function compile( ctx, env )
     end
     
     -- append return code
-    table.insert( ctx.code, 'return __TSUKUYOMI__:table_join( __RES__ );' );
+    table.insert( ctx.code, 'return __RES__;' );
     
     -- add end mark of function block
     table.insert( ctx.code, 'end' );
@@ -274,6 +274,7 @@ ACCEPT_KEYS['or'] = true;
 ACCEPT_KEYS['not'] = true;
 ACCEPT_KEYS['in'] = true;
 
+--TODO: should check tag context.
 local function analyze( ctx, tag )
     -- tokenize
     local stack = Stack.new();
@@ -367,7 +368,7 @@ local function pushText( ctx, tail )
         pos = pos
     });
     
-    appendCode( ctx, '__RES__[#__RES__+1] = \'' .. voidtxt .. '\';' );
+    appendCode( ctx, '__RES__ = __RES__ .. \'' .. voidtxt .. '\';' );
 
 end
 
@@ -470,7 +471,8 @@ local function slocPut( ctx, tag )
     
     if not err then
         appendCode( 
-            ctx, '__RES__[#__RES__+1] = ' .. table.concat( token ) .. ';' 
+            ctx, '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( ' .. 
+            table.concat( token ) .. ' );' 
         );
     end
     
@@ -487,10 +489,8 @@ local function slocInsert( ctx, tag )
         else
             ctx.insertions[ string.match( token[1], '([^\'"].+[^\'"])' ) ] = true;
             appendCode( 
-                ctx, 
-                '__RES__[#__RES__+1] = __TSUKUYOMI__:recite(' .. 
-                token[1] .. 
-                ', false, __DATA__, __LABEL__ );'
+                ctx, '__RES__ = __RES__ .. __TSUKUYOMI__:recite(' .. 
+                token[1] .. ', false, __DATA__, __LABEL__ );'
             );
         end
     end
@@ -533,8 +533,8 @@ local function slocCustom( ctx, tag )
         if cmd.output then
             appendCode( 
                 ctx, 
-                '__RES__[#__RES__+1] = __TSUKUYOMI__.cmds["' .. 
-                cmd.name .. '"].fn(' .. expr .. ');'
+                '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( __TSUKUYOMI__.cmds["' .. 
+                cmd.name .. '"].fn(' .. expr .. ') );'
             );
         -- invoke custom command
         else
@@ -640,7 +640,7 @@ function tsukuyomi:recite( label, ignoreNil, data, parent )
         val = '[' .. label .. ': circular insertion disallowed]';
     else
         local page = self.pages[label];
-        local res = {};
+        local res = '';
         
         if page then
             -- invoke script by coroutine
@@ -670,26 +670,26 @@ function tsukuyomi:recite( label, ignoreNil, data, parent )
     return val, success;
 end
 
-function tsukuyomi:table_join( arr, sep )
-    local res = {};
-    local k,v = next( arr );
-    local t;
+
+function tsukuyomi:tostring( ... )
+    local res = '';
+    local i,v,t;
     
     -- traverse table as array
-    while k do
+    for i,v in ipairs({...}) do
         t = type( v );
         if t == 'string' or t == 'number' then
-            table.insert( res, v );
+            res = res .. v;
         elseif t == 'boolean' then
-            table.insert( res, tostring( v ) );
+            res = res .. tostring( v );
         else
-            table.insert( res, '[' .. tostring( v ) .. ']' );
+            res = res .. '[' .. tostring( v ) .. ']';
         end
-        k,v = next( arr, k );
     end
     
-    return table.concat( res, sep );
+    return res;
 end
+
 
 -- class methods
 -- create instance
