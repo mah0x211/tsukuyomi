@@ -24,7 +24,7 @@
     THE SOFTWARE.
 
 --]]
-local lxsh = require('lxsh');
+local lexer = require('tsukuyomi.lexer');
 local PRIVATE_IDEN = {};
 PRIVATE_IDEN['_G'] = true;
 PRIVATE_IDEN['__TSUKUYOMI__'] = true;
@@ -283,10 +283,10 @@ local function analyze( ctx, tag )
     };
     local token = {};
     local idx = 1;
-    local k, v;
+    local head, tail, k, v;
     
-    for k, v in lxsh.lexers.lua.gmatch( tag.expr ) do
-        if k == 'error' then
+    for head, tail, k, v in lexer.scan( tag.expr ) do
+        if k == lexer.T_UNKNOWN then
             -- found data variable prefix
             if v == '$' then
                 token[idx] = '__DATA__';
@@ -295,7 +295,7 @@ local function analyze( ctx, tag )
             end
             return errstr( tag, 'unexpected symbol:' .. v );
         -- found identifier
-        elseif k == 'identifier' then
+        elseif k == lexer.T_VAR then
             -- not member fields
             if state.prev ~= '.' and state.prev ~= ':' then
                 -- private ident

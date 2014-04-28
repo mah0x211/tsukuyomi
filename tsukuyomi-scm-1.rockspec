@@ -10,14 +10,11 @@ description = {
     license = "MIT/X11",
     maintainer = "Masatoshi Teruya"
 }
-dependencies = {
-    "lpeg=0.10.2-1",
-    "lxsh"
-}
 build = {
     type = "builtin",
     modules = {
-        util = "tsukuyomi.lua"
+        tsukuyomi = "tsukuyomi.lua",
+        ['tsukuyomi.lexer'] = "lexer.lua"
     }
 }
 
