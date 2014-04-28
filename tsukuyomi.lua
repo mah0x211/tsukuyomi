@@ -288,7 +288,8 @@ local function analyze( ctx, tag )
     for head, tail, k, v in lexer.scan( tag.expr ) do
         if k == lexer.T_UNKNOWN then
             -- found data variable prefix
-            if v == '$' then
+            -- not member fields
+            if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
                 token[idx] = '__DATA__';
                 state.iden = true;
                 goto CONTINUE;
