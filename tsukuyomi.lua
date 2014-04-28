@@ -286,7 +286,9 @@ local function analyze( ctx, tag )
     local head, tail, k, v;
     
     for head, tail, k, v in lexer.scan( tag.expr ) do
-        if k == lexer.T_UNKNOWN then
+        if k == lexer.T_EPAIR then
+            return errstr( tag, 'unexpected symbol:' .. v );
+        elseif k == lexer.T_UNKNOWN then
             -- found data variable prefix
             -- not member fields
             if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
