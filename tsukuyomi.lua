@@ -315,6 +315,9 @@ local function analyze( ctx, tag )
             };
         -- found close-bracket
         elseif v == ']' then
+            if #stack == 0 then
+                return errstr( tag, 'invalid syntax: ' .. v );
+            end
             state = stack:pop();
         -- found not member operator
         elseif v ~= '.' then
