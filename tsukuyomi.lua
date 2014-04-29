@@ -679,7 +679,7 @@ function tsukuyomi:tostring( ... )
     local i,v,t;
     
     -- traverse table as array
-    for i,v in ipairs({...}) do
+    for i,v in pairs({...}) do
         t = type( v );
         if t == 'string' or t == 'number' then
             res = res .. v;
