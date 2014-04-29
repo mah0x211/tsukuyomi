@@ -107,7 +107,8 @@ end
 local function handleEnclosureToken( state, head, tail, token )
     if token ~= ']]' then
         local category = SYMBOL_TYPE[token];
-        local lhead, ltail, pat;
+        local lhead = tail;
+        local ltail, pat;
         
         if token == '[[' then
             pat = ']]';
@@ -115,15 +116,17 @@ local function handleEnclosureToken( state, head, tail, token )
             pat = token;
         end
         
-        lhead, ltail = state.expr:find( pat, tail + 1 );
-        -- found close symbol
-        if lhead then
-            -- substruct literal
-            token = state.expr:sub( head, ltail );
-            -- update cursor
-            state.cur = ltail + 1;
-            
-            return head, ltail, category, token;
+        while( lhead ) do
+            lhead, ltail = state.expr:find( pat, lhead + 1, true );
+            -- found close symbol and not escape sequence: [\] at front
+            if lhead and state.expr:byte( lhead - 1 ) ~= 0x5C then
+                -- substruct literal
+                token = state.expr:sub( head, ltail );
+                -- update cursor
+                state.cur = ltail + 1;
+                
+                return head, ltail, category, token;
+            end
         end
     end
     
