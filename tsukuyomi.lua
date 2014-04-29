@@ -263,10 +263,10 @@ end
 
 -- analyze
 local ACCEPT_KEYS = {};
-ACCEPT_KEYS['and'] = true;
-ACCEPT_KEYS['or'] = true;
-ACCEPT_KEYS['not'] = true;
 ACCEPT_KEYS['in'] = true;
+ACCEPT_KEYS['nil'] = true;
+ACCEPT_KEYS['true'] = true;
+ACCEPT_KEYS['false'] = true;
 
 --TODO: should check tag context.
 local function analyze( ctx, tag )
@@ -283,6 +283,10 @@ local function analyze( ctx, tag )
     for head, tail, k, v in lexer.scan( tag.expr ) do
         if k == lexer.T_EPAIR then
             return errstr( tag, 'unexpected symbol:' .. v );
+        elseif k == lexer.T_KEYWORD then
+            if not ACCEPT_KEYS[v] then
+                return errstr( tag, 'invalid keyword: ' .. v );
+            end
         elseif k == lexer.T_UNKNOWN then
             -- found data variable prefix
             -- not member fields
@@ -322,12 +326,8 @@ local function analyze( ctx, tag )
         -- found not member operator
         elseif v ~= '.' then
             state.iden = false;
-            if k == 'keyword' then
-                if not ACCEPT_KEYS[v] then
-                    return errstr( tag, 'invalid keyword: ' .. v );
-                end
             -- disallow termination symbol
-            elseif v == ';' then
+            if v == ';' then
                 return errstr( tag, 'invalid syntax: ' .. v );
             end
         end
