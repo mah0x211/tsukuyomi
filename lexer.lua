@@ -66,7 +66,7 @@ do
 
     -- literal
     for i, v in ipairs({
-        '"', '\'', '[[', ']]'
+        '"', '\'', '[[', ']]', '[='
     }) do
         SYMBOL_TYPE[v] = T_LITERAL;
     end
@@ -88,13 +88,13 @@ do
     
     for i, v in ipairs({
         '+', '-', '*', '/', '%', '^', ',', ';', '(', ')', '{', '}', '"', '\'', 
-        '#'
+        '#', ']'
     }) do
         SYMBOL_LA[v] = 0;
     end
     
     for i, v in ipairs({
-        '.', '[', ']', '<', '>', '=', '~', ':'
+        '.', '[', '<', '>', '=', '~', ':'
     }) do
         SYMBOL_LA[v] = 1;
     end
@@ -105,18 +105,52 @@ local function trim( str )
     return str:match( PAT_TRIM );
 end
 
+local function handleBracketLiteralToken( state, head, tail, token )
+    local category = SYMBOL_TYPE[token];
+    local lhead, ltail, pat;
+    
+    if token == '[[' then
+        pat = ']]';
+    else
+        -- find end of open bracket
+        lhead, ltail = state.expr:find( '^%[=+%[', head );
+        
+        if not lhead then
+            state.error = T_EPAIR;
+            return head, tail, T_EPAIR, token;
+        end
+        
+        -- update tail index
+        tail = ltail;
+        -- create close bracket pattern
+        pat = ']' .. state.expr:sub( lhead + 1, ltail - 1 ) .. ']';
+    end
+    
+    lhead = tail;
+    while( lhead ) do
+        lhead, ltail = state.expr:find( pat, lhead + 1, true );
+        -- found close symbol and not escape sequence: [\] at front
+        if lhead and state.expr:byte( lhead - 1 ) ~= 0x5C then
+            -- substruct literal
+            token = state.expr:sub( head, ltail );
+            -- update cursor
+            state.cur = ltail + 1;
+            
+            return head, ltail, category, token;
+        end
+    end
+    
+    state.error = T_EPAIR;
+    return head, tail, T_EPAIR, token;
+end
+
 
 local function handleEnclosureToken( state, head, tail, token )
     if token ~= ']]' then
         local category = SYMBOL_TYPE[token];
+        local pat = token;
         local lhead = tail;
-        local ltail, pat;
-        
-        if token == '[[' then
-            pat = ']]';
-        else
-            pat = token;
-        end
+        local ltail;
         
         while( lhead ) do
             lhead, ltail = state.expr:find( pat, lhead + 1, true );
@@ -158,6 +192,12 @@ local function handleSymToken( state, head, tail, token )
             elseif t == T_LITERAL or t == T_LABEL then
                 token = chk;
                 tail = head + len;
+                
+                -- bracket literal
+                if token:byte( 1 ) == 0x5B then
+                    return handleBracketLiteralToken( state, head, tail, token );
+                end
+                
                 return handleEnclosureToken( state, head, tail, token );
             end
         end
