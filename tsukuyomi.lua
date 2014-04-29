@@ -193,7 +193,6 @@ local function findTag( ctx )
         -- ignore if after whitespace:0x20
         if word == ' ' then
             quot = nil;
-            goto CONTINUE;
         -- found open bracket
         else
             tag = { head = head - 1 };
@@ -211,13 +210,10 @@ local function findTag( ctx )
                         -- found
                         if lbhead then
                             tail = lbtail;
-                            goto NEXT_WORD;
                         end
                     end
-                end
-                
                 -- found quot: [", '] and not escape sequence: [\] at front
-                if SYM_QUOT[word] and txt:byte(tail-1) ~= 0x5C then
+                elseif SYM_QUOT[word] and txt:byte(tail-1) ~= 0x5C then
                     -- clear current quot if close quot
                     if quot == word then
                         quot = nil;
@@ -231,36 +227,34 @@ local function findTag( ctx )
                     break;
                 end
                 
-                ::NEXT_WORD::
                 tail = tail + 1;
                 word = txt:sub( tail, tail );
             end
-        end
-        
-        -- close bracket not found
-        -- missing end of bracket
-        if word == '' then
-            break;
-        -- create tag struct
-        else
-            tag.tail = tail;
-            -- trim /^\s|\s$/g
-            tag.token = string.match( 
-                -- remove \n
-                string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
-                '([^%s].+[^%s])'
-            );
-            -- separate NAME, SP, EXPR
-            tag.name, word, tag.expr = string.match( tag.token, '^(%g+)(%s*)(.*)' );
-            -- set nil to empty
-            if tag.expr == '' then
-                tag.expr = nil;
+            
+            -- close bracket not found
+            -- missing end of bracket
+            if word == '' then
+                break;
+            -- create tag struct
+            else
+                tag.tail = tail;
+                -- trim /^\s|\s$/g
+                tag.token = string.match( 
+                    -- remove \n
+                    string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
+                    '([^%s].+[^%s])'
+                );
+                -- separate NAME, SP, EXPR
+                tag.name, word, tag.expr = string.match( tag.token, '^(%g+)(%s*)(.*)' );
+                -- set nil to empty
+                if tag.expr == '' then
+                    tag.expr = nil;
+                end
+                tag.lineno, tag.pos = linepos( txt, tag.head, tag.tail );
+                break;
             end
-            tag.lineno, tag.pos = linepos( txt, tag.head, tag.tail );
-            break;
         end
         
-        ::CONTINUE::
         head, tail = string.find( txt, '<?', tail, true );
     end
     
@@ -283,6 +277,7 @@ local function analyze( ctx, tag )
     };
     local token = {};
     local idx = 1;
+    local skipContext = false;
     local head, tail, k, v;
     
     for head, tail, k, v in lexer.scan( tag.expr ) do
@@ -294,9 +289,10 @@ local function analyze( ctx, tag )
             if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
                 token[idx] = '__DATA__';
                 state.iden = true;
-                goto CONTINUE;
+                skipContext = true;
+            else
+                return errstr( tag, 'unexpected symbol:' .. v );
             end
-            return errstr( tag, 'unexpected symbol:' .. v );
         -- found identifier
         elseif k == lexer.T_VAR then
             -- not member fields
@@ -333,10 +329,13 @@ local function analyze( ctx, tag )
             end
         end
         
-        state.prev = v;
-        token[idx] = v;
+        if skipContext then
+            skipContext = false;
+        else
+            state.prev = v;
+            token[idx] = v;
+        end
         
-        ::CONTINUE::
         idx = idx + 1;
     end
     
@@ -596,11 +595,11 @@ local function parse( ctx )
                 table.insert( ctx.tag_decl, tag );
                 err = sloc( ctx, tag );
                 if err then
-                    goto DONE;
+                    break;
                 end
             else
                 err = 'unknown expr: ' .. tag.name;
-                goto DONE;
+                break;
             end
             
             -- move caret
@@ -615,16 +614,13 @@ local function parse( ctx )
         end
         
         -- push remain text
-        if ctx.caret < ctx.length then
+        if not err and ctx.caret < ctx.length then
             pushText( ctx, ctx.length );
         end
     end
     
-    ::DONE::
-    if not err then
-        if #ctx.block_stack > 0 then
-            err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
-        end
+    if not err and #ctx.block_stack > 0 then
+        err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
     end
     
     return err;
