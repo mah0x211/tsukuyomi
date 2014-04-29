@@ -27,6 +27,7 @@
 -- patterns
 local PAT_SYMBOL = '[-+*/^.<>=~"\'(){}%%%[%],:;#%s]';
 local PAT_NONIDENT = '[^%w_]';
+local PAT_NUMBER = '%d+';
 local PAT_TRIM = '^[%s]*(.*[^%s])[%s]*$';
 -- types
 local T_EPAIR = -1;
@@ -38,6 +39,7 @@ local T_VAR = 4;
 local T_VLIST = 5;
 local T_KEYWORD = 6;
 local T_OPERATOR = 7;
+local T_NUMBER = 8;
 
 -- set keywords
 local KEYWORD = {};
@@ -183,6 +185,8 @@ local function handleNameToken( state, head, tail, token )
         end
     elseif KEYWORD[token] then
         category = T_KEYWORD;
+    elseif token:find( PAT_NUMBER ) then
+        category = T_NUMBER;
     else
         category = T_VAR;
     end
