@@ -68,6 +68,7 @@ local function ignoreNilOps( ignore )
     end
 end
 
+
 -- Stack class(metatable)
 local Stack = {};
 
@@ -76,9 +77,11 @@ function Stack:push( arg )
     table.insert( self, arg );
 end
 
+
 function Stack:pop()
     return table.remove( self );
 end
+
 
 -- create Stack instance
 function Stack.new()
@@ -86,6 +89,7 @@ function Stack.new()
         __index = Stack
     });
 end
+
 
 local function tableKeys( tbl )
     local list = {};
@@ -97,6 +101,7 @@ local function tableKeys( tbl )
     
     return list, idx - 1;
 end
+
 
 -- find lineno and position
 local function linepos( src, head )
@@ -117,6 +122,7 @@ local function linepos( src, head )
     
     return lineno, pos;
 end
+
 
 -- generate error string
 local function errstr( tag, msg, label )
@@ -141,6 +147,7 @@ local function errmap( srcmap, err, label )
     
     return err;
 end
+
 
 -- compile script
 local function compile( ctx, env )
@@ -175,92 +182,89 @@ local function compile( ctx, env )
     return err, script;
 end
 
+
 -- tag parser
 local SYM_QUOT = {
     ['\''] = true,
     ['"'] = true
 };
 
-local function findTag( ctx )
-    local txt = ctx.txt;
-    local caret = ctx.caret;
-    local head, tail = string.find( txt, '<?', caret, true );
-    local ignore = false;
-    local quot, tag, word, lineno, pos, lbhead, lbtail, literal;
+
+local function findTagClose( txt, len, cur )
+    local c, idx, head, tail;
     
-    while head do
-        tail = tail + 1;
-        word = txt:sub( tail, tail );
-        -- ignore if after whitespace:0x20
-        if word == ' ' then
-            quot = nil;
-        -- found open bracket
-        else
-            tag = { head = head - 1 };
-            skipSP = false;
-            -- search close bracket ?>:[0x3F][0x3E]
-            while word ~= '' do
-                -- check literal-bracket(double-bracket)
-                if word == '[' then
-                    lbhead, lbtail = txt:find( '^%[=*%[', tail );
-                    -- found open literal-bracket
-                    if lbhead then
-                        -- find close literal-bracket
-                        literal = txt:sub( lbhead, lbtail ):gsub( '%[', '%]' );
-                        lbhead, lbtail = txt:find( literal, lbtail + 1, true );
-                        -- found
-                        if lbhead then
-                            tail = lbtail;
-                        end
-                    end
-                -- found quot: [", '] and not escape sequence: [\] at front
-                elseif SYM_QUOT[word] and txt:byte(tail-1) ~= 0x5C then
-                    -- clear current quot if close quot
-                    if quot == word then
-                        quot = nil;
-                    -- set current quot if not in quot
-                    elseif not quot then
-                        quot = word;
-                    end
-                -- not in quot and found close bracket
-                elseif not quot and word == '?' and txt:byte(tail+1) == 0x3E then
-                    tail = tail + 1;
+    -- search close bracket ?>:[0x3F][0x3E]
+    while cur < len do
+        c = txt:sub( cur, cur );
+        -- check literal-bracket(double-bracket)
+        if c == '[' then
+            head, tail = txt:find( '^%[=*%[', cur );
+            -- found open literal-bracket
+            if head then
+                -- find close literal-bracket
+                c = txt:sub( head, tail ):gsub( '%[', '%]' );
+                head, tail = txt:find( literal, tail + 1, true );
+                -- invalid syntax
+                if not head then
                     break;
                 end
-                
-                tail = tail + 1;
-                word = txt:sub( tail, tail );
+                -- skip literal bracket
+                cur = tail + 1;
             end
-            
-            -- close bracket not found
-            -- missing end of bracket
-            if word == '' then
+        -- found quot: [", '] and not escape sequence: [\] at front
+        elseif SYM_QUOT[c] and txt:byte( cur - 1 ) ~= 0x5C then
+            head, tail = txt:find( '[^\\]' .. c, cur + 1 );
+            -- invalid syntax
+            if not head then
                 break;
+            end
+            -- skip quot
+            cur = tail + 1;
+        -- found close bracket
+        elseif c == '?' and txt:byte( cur + 1 ) == 0x3E then
+            return cur + 1;
+        -- move to next index
+        else
+            cur = cur + 1;
+        end
+    end
+    
+    return nil;
+end
+
+
+local function findTag( ctx )
+    local txt = ctx.txt;
+    local head, tail = string.find( txt, '<%?[$%l%u]', ctx.caret );
+    local tag, word;
+    
+    -- found open bracket
+    if head then
+        tag = { head = head - 1 };
+        tag.lineno, tag.pos = linepos( txt, tag.head );
+        tail = findTagClose( txt, ctx.length, tail + 1 );
+        -- found close bracket
+        if tail then
             -- create tag struct
-            else
-                tag.tail = tail;
-                -- trim /^\s|\s$/g
-                tag.token = string.match( 
-                    -- remove \n
-                    string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
-                    '([^%s].+[^%s])'
-                );
-                -- separate NAME, SP, EXPR
-                tag.name, word, tag.expr = string.match( tag.token, '^(%g+)(%s*)(.*)' );
-                -- set nil to empty
-                if tag.expr == '' then
-                    tag.expr = nil;
-                end
-                tag.lineno, tag.pos = linepos( txt, tag.head );
-                break;
+            tag.tail = tail;
+            -- trim /^\s|\s$/g
+            tag.token = string.match( 
+                -- remove \n
+                string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
+                '([^%s].+[^%s])'
+            );
+            -- separate NAME, SP, EXPR
+            tag.name, word, tag.expr = string.match( tag.token, '^([$]?[%l%u]+)(%s*)(.*)' );
+            -- set nil to empty
+            if tag.expr == '' then
+                tag.expr = nil;
             end
         end
-        
-        head, tail = string.find( txt, '<?', tail, true );
     end
     
     return tag;
 end
+
 
 -- analyze
 local ACCEPT_KEYS = {};
