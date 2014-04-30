@@ -586,7 +586,7 @@ local function parse( ctx )
         while tag do
             -- no close bracket: ?>
             if not tag.tail then
-                return 'could not found closed-bracket';
+                return errstr( tag, 'could not found closed-bracket' );
             -- push plain text
             elseif ctx.caret <= tag.head then
                 pushText( ctx, tag.head );
@@ -606,8 +606,7 @@ local function parse( ctx )
                     break;
                 end
             else
-                err = 'unknown expr: ' .. tag.name;
-                break;
+                return errstr( tag, 'unknown expr: ' .. tag.name );
             end
             
             -- move caret
@@ -628,7 +627,8 @@ local function parse( ctx )
     end
     
     if not err and #ctx.block_stack > 0 then
-        err = errstr( ctx.block_stack:pop(), 'end of block statement not found' );
+        return errstr( ctx.block_stack:pop(), 
+                       'end of block statement not found' );
     end
     
     return err;
