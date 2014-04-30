@@ -540,7 +540,7 @@ local function slocCustom( ctx, tag )
         local expr = table.concat( token );
         
         -- invoke custom command and output result
-        if cmd.output then
+        if cmd.enableOutput then
             appendCode( 
                 ctx, tag, 
                 '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( __TSUKUYOMI__.cmds["' .. 
@@ -716,7 +716,7 @@ end
 
 local PREFIX_CMD = '$';
 -- set custom user command
-local function tsukuyomi_cmd_set( t, cmd, fn, output )
+local function tsukuyomi_cmd_set( t, cmd, fn, enableOutput )
     if type( cmd ) ~= 'string' then
         error( 'invalid argument: cmd must be type of string' );
     elseif type( fn ) ~= 'function' then
@@ -732,7 +732,7 @@ local function tsukuyomi_cmd_set( t, cmd, fn, output )
         t.cmds[cmd] = {
             name = cmd,
             fn = fn,
-            output = output and true or false
+            enableOutput = enableOutput and true or false
         };
     end
 end
@@ -752,7 +752,7 @@ local function tsukuyomi_remove( t, label )
 end
 
 -- read template context
-local function tsukuyomi_read( t, label, txt, srcmap )
+local function tsukuyomi_read( t, label, txt, enableSourceMap )
     local ctx = {
         env = t.env or {},
         cmds = t.cmds,
@@ -790,7 +790,7 @@ local function tsukuyomi_read( t, label, txt, srcmap )
             -- add page
             t.pages[label] = {
                 script = script,
-                srcmap = srcmap and ctx.tag_decl or nil
+                srcmap = enableSourceMap and ctx.tag_decl or nil
             };
             insertions = ctx.insertions;
         end
