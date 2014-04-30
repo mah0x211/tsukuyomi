@@ -500,7 +500,7 @@ local function slocInsert( ctx, tag )
             ctx.insertions[ string.match( token[1], '([^\'"].+[^\'"])' ) ] = true;
             appendCode( 
                 ctx, '__RES__ = __RES__ .. __TSUKUYOMI__:recite(' .. 
-                token[1] .. ', false, __DATA__, __LABEL__ );'
+                token[1] .. ', __DATA__, false, __LABEL__ );'
             );
         end
     end
@@ -639,7 +639,7 @@ end
 -- tsukuyomi instance methods(metatable)
 local tsukuyomi = {};
 
-function tsukuyomi:recite( label, ignoreNil, data, parent )
+function tsukuyomi:recite( label, data, ignoreNil, parent )
     local success = false;
     local val;
     
