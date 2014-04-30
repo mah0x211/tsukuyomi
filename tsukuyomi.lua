@@ -643,7 +643,10 @@ function tsukuyomi:recite( label, data, ignoreNil, parent )
     local success = false;
     local val;
     
-    if label == parent then
+    if type( label ) ~= 'string' then
+        val = '[insertion label must be type of string: ' .. 
+              tostring(label) .. ']';
+    elseif label == parent then
         val = '[' .. label .. ': circular insertion disallowed]';
     else
         local page = self.pages[label];
