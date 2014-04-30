@@ -99,11 +99,12 @@ local function tableKeys( tbl )
 end
 
 -- find lineno and position
-local function linepos( src, head, tail )
+local function linepos( src, head )
     local str = src:sub( 1, head );
     local originHead = head;
     local lineno = 1;
     local pos = 1;
+    local tail;
     
     head, tail = string.find( str, '\n', 1, true );
     
@@ -250,7 +251,7 @@ local function findTag( ctx )
                 if tag.expr == '' then
                     tag.expr = nil;
                 end
-                tag.lineno, tag.pos = linepos( txt, tag.head, tag.tail );
+                tag.lineno, tag.pos = linepos( txt, tag.head );
                 break;
             end
         end
@@ -365,7 +366,7 @@ local function pushText( ctx, tail )
         '[\n\'\\]', 
         VOIDTXT_TBL 
     );
-    local lineno, pos = linepos( ctx.txt, ctx.caret, tail );
+    local lineno, pos = linepos( ctx.txt, ctx.caret );
     
     -- add tag index
     table.insert( ctx.tag_decl, {
