@@ -25,32 +25,76 @@
 
 --]]
 local tsukuyomi = require('tsukuyomi');
-local sandbox = _G;
-local views = tsukuyomi.new( sandbox );
-local srcmap = true;
-local ignoreNilOps = true;
-local err, insertions, res, success;
 
--- read page_hello
-err ,insertions = tsukuyomi.read( views, 'hello', [[
-Hello <?insert "world" ?>
-]], srcmap );
-if err then
-    error( err );
-end
--- read page_world
-err, insertions = tsukuyomi.read( views, 'world', [[
-World!
-]], srcmap );
-if err then
-    error( err );
+-- for custom command $put
+local function put( ... )
+    local args = {...};
+    table.insert( args, ' : custom output' );
+    return table.concat( args );
 end
 
--- render
-res, success = views:recite( 'hello', ignoreNilOps, {} );
-if not success then
-    error( res );
-else
-    print( res );
+-- create template object
+local function createTemplate( sandbox )
+    local tmpl = tsukuyomi.new( sandbox );
+    local enableOutput = true;
+    
+    -- register custom command $put
+    tsukuyomi.setCmd( tmpl, 'put', put, enableOutput );
+    
+    return tmpl;
 end
---print( views:recite( 'world', ignoreNilOps, {} ) );
+
+-- read template file
+local function readViewFile( tmpl, path )
+    local fd, err = io.open( path );
+    
+    if fd then
+        local src;
+        
+        src, err = fd:read('*a');
+        fd:close();
+        if src then
+            local label = path;
+            local enableSourceMap = true;
+            local insertions;
+            
+            err, insertions = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+            if not err then
+                for path in pairs( insertions ) do
+                    readViewFile( tmpl, path );
+                end
+            end
+        end
+    end
+    
+    if err then
+        print( err );
+    end
+end
+
+-- render template
+local function renderTemplate( tmpl, label, data )
+    local ignoreNilOperations = true;
+    local res, success = tmpl:render( label, data, ignoreNilOperations );
+    
+    if success then
+        print( res );
+    else
+        print( 'error: ', res );
+    end
+end
+
+
+local tmpl = createTemplate( _G );
+local viewFile = './README.md';
+local data = {
+    x = {
+        y = {
+            z = 'external data'
+        }
+    }
+};
+
+readViewFile( tmpl, viewFile );
+renderTemplate( tmpl, viewFile, data );
+
