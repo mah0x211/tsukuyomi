@@ -505,10 +505,17 @@ local function slocInsert( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            ctx.insertions[ string.match( token[1], '([^\'"].+[^\'"])' ) ] = true;
-            appendCode( ctx, tag, 
-                        '__RES__ = __RES__ .. __TSUKUYOMI__:render(' .. 
-                        token[1] .. ', __DATA__, false, __LABEL__ );' );
+            local name = token[1]:match( '^[\'"](.*)[\'"]$' );
+            
+            if name then
+                ctx.insertions[name] = true;
+            end
+            
+            if not err then
+                appendCode( ctx, tag, 
+                            '__RES__ = __RES__ .. __TSUKUYOMI__:render(' .. 
+                            token[1] .. ', __DATA__, false, __LABEL__ );' );
+            end
         end
     end
     
