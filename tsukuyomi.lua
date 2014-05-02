@@ -275,79 +275,83 @@ ACCEPT_KEYS['false'] = true;
 
 --TODO: should check tag context.
 local function analyze( ctx, tag )
-    -- tokenize
-    local stack = Stack.new();
-    local state = {
-        iden = false
-    };
-    local token = {};
-    local idx = 1;
-    local skipContext = false;
-    local head, tail, k, v;
-    
-    for head, tail, k, v in lexer.scan( tag.expr ) do
-        if k == lexer.T_EPAIR then
-            return errstr( tag, 'unexpected symbol:' .. v );
-        elseif k == lexer.T_KEYWORD then
-            if not ACCEPT_KEYS[v] then
-                return errstr( tag, 'invalid keyword: ' .. v );
-            end
-        elseif k == lexer.T_UNKNOWN then
-            -- found data variable prefix
-            -- not member fields
-            if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
-                token[idx] = '__DATA__';
-                state.iden = true;
-                skipContext = true;
-            else
+    if tag.expr then
+        -- tokenize
+        local stack = Stack.new();
+        local state = {
+            iden = false
+        };
+        local token = {};
+        local idx = 1;
+        local skipContext = false;
+        local head, tail, k, v;
+        
+        for head, tail, k, v in lexer.scan( tag.expr ) do
+            if k == lexer.T_EPAIR then
                 return errstr( tag, 'unexpected symbol:' .. v );
-            end
-        -- found identifier
-        elseif k == lexer.T_VAR then
-            -- not member fields
-            if state.prev ~= '.' and state.prev ~= ':' then
-                -- private ident
-                if PRIVATE_IDEN[v] then
-                    return errstr( tag, 'cannot access to private variable:' .. v );
-                -- to declare to local if identifier does not exists at environment
-                elseif not ctx.env[v] then
-                    ctx.local_decl[v] = true;
+            elseif k == lexer.T_KEYWORD then
+                if not ACCEPT_KEYS[v] then
+                    return errstr( tag, 'invalid keyword: ' .. v );
                 end
-                state.iden = true;
+            elseif k == lexer.T_UNKNOWN then
+                -- found data variable prefix
+                -- not member fields
+                if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
+                    token[idx] = '__DATA__';
+                    state.iden = true;
+                    skipContext = true;
+                else
+                    return errstr( tag, 'unexpected symbol:' .. v );
+                end
+            -- found identifier
+            elseif k == lexer.T_VAR then
+                -- not member fields
+                if state.prev ~= '.' and state.prev ~= ':' then
+                    -- private ident
+                    if PRIVATE_IDEN[v] then
+                        return errstr( tag, 'cannot access to private variable:' .. v );
+                    -- to declare to local if identifier does not exists at environment
+                    elseif not ctx.env[v] then
+                        ctx.local_decl[v] = true;
+                    end
+                    state.iden = true;
+                end
+            -- found open-bracket
+            elseif v == '[' then
+                -- save current state
+                stack:push( state );
+                state = {
+                    iden = false;
+                };
+            -- found close-bracket
+            elseif v == ']' then
+                if #stack == 0 then
+                    return errstr( tag, 'invalid syntax: ' .. v );
+                end
+                state = stack:pop();
+            -- found not member operator
+            elseif v ~= '.' then
+                state.iden = false;
+                -- disallow termination symbol
+                if v == ';' then
+                    return errstr( tag, 'invalid syntax: ' .. v );
+                end
             end
-        -- found open-bracket
-        elseif v == '[' then
-            -- save current state
-            stack:push( state );
-            state = {
-                iden = false;
-            };
-        -- found close-bracket
-        elseif v == ']' then
-            if #stack == 0 then
-                return errstr( tag, 'invalid syntax: ' .. v );
+            
+            if skipContext then
+                skipContext = false;
+            else
+                state.prev = v;
+                token[idx] = v;
             end
-            state = stack:pop();
-        -- found not member operator
-        elseif v ~= '.' then
-            state.iden = false;
-            -- disallow termination symbol
-            if v == ';' then
-                return errstr( tag, 'invalid syntax: ' .. v );
-            end
+            
+            idx = idx + 1;
         end
         
-        if skipContext then
-            skipContext = false;
-        else
-            state.prev = v;
-            token[idx] = v;
-        end
-        
-        idx = idx + 1;
+        return nil, token, idx - 1;
     end
     
-    return nil, token, idx - 1;
+    return errstr( tag, 'too few arguments: ' .. tostring(expr) );
 end
 
 -- generate source lines of code
