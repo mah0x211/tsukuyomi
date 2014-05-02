@@ -210,10 +210,13 @@ local function findTagClose( txt, len, cur )
                 end
                 -- skip literal bracket
                 cur = tail + 1;
+            -- move to next index
+            else
+                cur = cur + 1;
             end
         -- found quot: [", '] and not escape sequence: [\] at front
         elseif SYM_QUOT[c] and txt:byte( cur - 1 ) ~= 0x5C then
-            head, tail = txt:find( '[^\\]' .. c, cur + 1 );
+            head, tail = txt:find( '[^\\]' .. c, cur );
             -- invalid syntax
             if not head then
                 break;
