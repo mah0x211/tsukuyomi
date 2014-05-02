@@ -651,8 +651,7 @@ function tsukuyomi:render( label, data, ignoreNil, parent )
     local val;
     
     if type( label ) ~= 'string' then
-        val = '[insertion label must be type of string: ' .. 
-              tostring(label) .. ']';
+        val = '[label must be type of string: ' .. tostring(label) .. ']';
     elseif label == parent then
         val = '[' .. label .. ': circular insertion disallowed]';
     else
@@ -680,7 +679,7 @@ function tsukuyomi:render( label, data, ignoreNil, parent )
                 val = errmap( page.srcmap, val, label );
             end
         else
-            val = '[' .. label .. ' not found]';
+            val = '[template:' .. label .. ' not found]';
         end
     end
     
