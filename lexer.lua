@@ -45,6 +45,8 @@ local T_BRACKET_OPEN = 10;
 local T_BRACKET_CLOSE = 11;
 local T_PAREN_OPEN = 12;
 local T_PAREN_CLOSE = 13;
+local T_CURLY_OPEN = 14;
+local T_CURLY_CLOSE = 15;
 
 -- set keywords
 local KEYWORD = {};
@@ -71,6 +73,8 @@ local SYMBOL_TYPE = {
     [']'] = T_BRACKET_CLOSE,
     ['('] = T_PAREN_OPEN,
     [')'] = T_PAREN_CLOSE,
+    ['{'] = T_CURLY_OPEN,
+    ['}'] = T_CURLY_CLOSE
 };
 do
     local i,v;
@@ -83,7 +87,7 @@ do
     end
     -- operator
     for i, v in ipairs({
-        '+', '-', '*', '/', '%', '^', ';', '..', '{', '}', '<', '<=', 
+        '+', '-', '*', '/', '%', '^', ';', '..', '<', '<=', 
         '>', '>=', '=', '==', '~=', '#', 'and', 'or', 'not'
     }) do
         SYMBOL_TYPE[v] = T_OPERATOR;
@@ -318,5 +322,7 @@ return {
     T_BRACKET_OPEN = T_BRACKET_OPEN,
     T_BRACKET_CLOSE = T_BRACKET_CLOSE,
     T_PAREN_OPEN = T_PAREN_OPEN,
-    T_PAREN_CLOSE = T_PAREN_CLOSE
+    T_PAREN_CLOSE = T_PAREN_CLOSE,
+    T_CURLY_OPEN = T_CURLY_OPEN,
+    T_CURLY_CLOSE = T_CURLY_CLOSE
 };
