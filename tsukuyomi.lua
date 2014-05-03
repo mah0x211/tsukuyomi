@@ -47,6 +47,7 @@ end
 local METATBL_NIL = {
     __index = nilIdx,
     __newindex = nilIdx,
+    __call = nilIdx,
     __concat = nilOps,
     __add = nilOps,
     __sub = nilOps,
