@@ -36,10 +36,15 @@ local T_SPACE = 1;
 local T_LITERAL = 2;
 local T_LABEL = 3;
 local T_VAR = 4;
-local T_VLIST = 5;
-local T_KEYWORD = 6;
-local T_OPERATOR = 7;
-local T_NUMBER = 8;
+local T_MEMBER = 5;
+local T_VLIST = 6;
+local T_KEYWORD = 7;
+local T_OPERATOR = 8;
+local T_NUMBER = 9;
+local T_BRACKET_OPEN = 10;
+local T_BRACKET_CLOSE = 11;
+local T_PAREN_OPEN = 12;
+local T_PAREN_CLOSE = 13;
 
 -- set keywords
 local KEYWORD = {};
@@ -59,7 +64,13 @@ end
 local SYMBOL_TYPE = {
     [' '] = T_SPACE,
     ['::'] = T_LABEL,
-    [','] = T_VLIST
+    ['.'] = T_MEMBER,
+    [':'] = T_MEMBER,
+    [','] = T_VLIST,
+    ['['] = T_BRACKET_OPEN,
+    [']'] = T_BRACKET_CLOSE,
+    ['('] = T_PAREN_OPEN,
+    [')'] = T_PAREN_CLOSE,
 };
 do
     local i,v;
@@ -72,9 +83,8 @@ do
     end
     -- operator
     for i, v in ipairs({
-        '+', '-', '*', '/', '%', '^', ',', ';', '.', '..', '[', ']', '(', ')', 
-        '{', '}', '<', '<=', '>', '>=', '=', '==', '~=', '#', ':', 'and', 'or', 
-        'not'
+        '+', '-', '*', '/', '%', '^', ',', ';', '..', '{', '}', '<', '<=', 
+        '>', '>=', '=', '==', '~=', '#', 'and', 'or', 'not'
     }) do
         SYMBOL_TYPE[v] = T_OPERATOR;
     end
@@ -178,7 +188,8 @@ local function handleSymToken( state, head, tail, token )
         category = T_UNKNOWN;
     elseif category == T_LITERAL then
         return handleEnclosureToken( state, head, tail, token );
-    elseif category == T_OPERATOR then
+    elseif category == T_OPERATOR or category == T_MEMBER or 
+           category == T_BRACKET_OPEN or category == T_BRACKET_CLOSE then
         local len = SYMBOL_LA[token];
         
         -- check next char
@@ -299,7 +310,13 @@ return {
     T_LITERAL = T_LITERAL,
     T_LABEL = T_LABEL,
     T_VAR = T_VAR,
+    T_MEMBER = T_MEMBER,
     T_VLIST = T_VLIST,
     T_KEYWORD = T_KEYWORD,
-    T_OPERATOR = T_OPERATOR
+    T_OPERATOR = T_OPERATOR,
+    T_NUMBER = T_NUMBER,
+    T_BRACKET_OPEN = T_BRACKET_OPEN,
+    T_BRACKET_CLOSE = T_BRACKET_CLOSE,
+    T_PAREN_OPEN = T_PAREN_OPEN,
+    T_PAREN_CLOSE = T_PAREN_CLOSE
 };
