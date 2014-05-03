@@ -312,9 +312,11 @@ local function stackPop( stack, token, t, v )
         token = state.token;
         if token.len > 0 then
             tmp = token.list[token.len];
-            t = tmp.type;
-            v = tmp.val .. v;
-            token.len = token.len - 1;
+            if tmp.type == lexer.T_VAR then
+                t = tmp.type;
+                v = tmp.val .. v;
+                token.len = token.len - 1;
+            end
         end
         
         -- remove current stack
