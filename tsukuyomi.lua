@@ -378,9 +378,6 @@ local function analyze( ctx, tag )
                 v = token.list[token.len].val .. v;
                 token.len = token.len - 1;
             elseif t == lexer.T_BRACKET_OPEN then
-                if state.type ~= lexer.T_VAR then
-                    return errstr( tag, 'unexpected symbol: ' .. v );
-                end
                 state, token = stackPush( stack, state, lexer.T_BRACKET_CLOSE );
             elseif t == lexer.T_PAREN_OPEN then
                 if not state.type or state.type == lexer.T_OPERATOR or 
