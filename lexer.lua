@@ -189,6 +189,7 @@ local function handleSymToken( state, head, tail, token )
             if t == T_OPERATOR then
                 token = chk;
                 tail = head + len;
+                category = t;
             elseif t == T_LITERAL or t == T_LABEL then
                 token = chk;
                 tail = head + len;
