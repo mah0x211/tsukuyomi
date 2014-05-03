@@ -224,12 +224,16 @@ local function handleNameToken( state, head, tail, token )
             token = token:sub( 1, shead - 1 );
             tail = tail - shead;
         end
-    elseif KEYWORD[token] then
-        category = T_KEYWORD;
-    elseif token:find( PAT_NUMBER ) then
-        category = T_NUMBER;
     else
-        category = T_VAR;
+        category = KEYWORD[token] or SYMBOL_TYPE[token];
+        
+        if not category then
+            if token:find( PAT_NUMBER ) then
+                category = T_NUMBER;
+            else
+                category = T_VAR;
+            end
+        end
     end
     
     -- update cursor
