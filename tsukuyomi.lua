@@ -203,7 +203,7 @@ local function findTagClose( txt, len, cur )
             if head then
                 -- find close literal-bracket
                 c = txt:sub( head, tail ):gsub( '%[', '%]' );
-                head, tail = txt:find( literal, tail + 1, true );
+                head, tail = txt:find( c, tail + 1, true );
                 -- invalid syntax
                 if not head then
                     break;
