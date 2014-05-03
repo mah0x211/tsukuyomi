@@ -276,86 +276,159 @@ ACCEPT_KEYS['nil'] = true;
 ACCEPT_KEYS['true'] = true;
 ACCEPT_KEYS['false'] = true;
 
+
+local function stackPush( stack, state, t )
+    local token = {
+        list = {},
+        len = 0
+    };
+    
+    state.type = t;
+    state = {
+        token = token
+    };
+    stack.len = stack.len + 1;
+    rawset( stack.list, stack.len, state );
+    
+    return state, token;
+end
+
+
+local function stackPop( stack, token, t, v )
+    local state = stack.len > 1 and rawget( stack.list, stack.len - 1 ) or nil;
+    
+    if not state or state.type ~= t then
+        return 'unexpected symbol: ' .. v;
+    else
+        local tmp = '';
+        
+        -- merge current tokens
+        table.foreach( token.list, function( idx, item )
+            tmp = tmp .. item.val;
+        end);
+        v = tmp .. v;
+        
+        -- append to prev token
+        token = state.token;
+        if token.len > 0 then
+            tmp = token.list[token.len];
+            t = tmp.type;
+            v = tmp.val .. v;
+            token.len = token.len - 1;
+        end
+        
+        -- remove current stack
+        rawset( stack.list, stack.len, nil );
+        stack.len = stack.len - 1;
+        
+        return nil, state, token, t, v;
+    end
+end
+
+
 --TODO: should check tag context.
 local function analyze( ctx, tag )
     if tag.expr then
-        -- tokenize
-        local stack = Stack.new();
-        local state = {
-            iden = false
+        local token = {
+            list = {},
+            len = 0
         };
-        local token = {};
-        local idx = 1;
-        local skipContext = false;
-        local head, tail, k, v;
+        local state = {
+            token = token
+        };
+        local stack = {
+            list = { state },
+            len = 1
+        }
+        local head, tail, t, v, err;
         
-        for head, tail, k, v in lexer.scan( tag.expr ) do
-            if k == lexer.T_EPAIR then
-                return errstr( tag, 'unexpected symbol:' .. v );
-            elseif k == lexer.T_KEYWORD then
+        for head, tail, t, v in lexer.scan( tag.expr ) do
+            if t == lexer.T_EPAIR then
+                return errstr( tag, 'unexpected symbol: ' .. v );
+            elseif t == lexer.T_UNKNOWN then
+                -- found data variable prefix
+                -- not member fields
+                if v == '$' then
+                    t = lexer.T_VAR;
+                    v = '__DATA__';
+                else
+                    return errstr( tag, 'unexpected symbol: ' .. v );
+                end
+            elseif t == lexer.T_KEYWORD then
                 if not ACCEPT_KEYS[v] then
                     return errstr( tag, 'invalid keyword: ' .. v );
                 end
-            elseif k == lexer.T_UNKNOWN then
-                -- found data variable prefix
-                -- not member fields
-                if v == '$' and state.prev ~= '.' and state.prev ~= ':' then
-                    token[idx] = '__DATA__';
-                    state.iden = true;
-                    skipContext = true;
+            -- merge space
+            elseif t == lexer.T_SPACE then
+                t = state.type;
+                v = token.list[token.len].val .. v;
+                token.len = token.len - 1;
+            elseif t == lexer.T_VAR then
+                if state.type == lexer.T_MEMBER then
+                    v = token.list[token.len].val .. v;
+                    token.len = token.len - 1;
+                -- private ident
+                elseif PRIVATE_IDEN[v] then
+                    return errstr( tag, 'cannot access to private variable: ' .. v );
+                -- to declare to local if identifier does not exists at environment
+                elseif not ctx.env[v] then
+                    ctx.local_decl[v] = true;
+                end
+            elseif t == lexer.T_MEMBER then
+                v = token.list[token.len].val .. v;
+                token.len = token.len - 1;
+            elseif t == lexer.T_BRACKET_OPEN then
+                if state.type ~= lexer.T_VAR then
+                    return errstr( tag, 'unexpected symbol: ' .. v );
+                end
+                state, token = stackPush( stack, state, lexer.T_BRACKET_CLOSE );
+            elseif t == lexer.T_PAREN_OPEN then
+                if not state.type or state.type == lexer.T_OPERATOR or 
+                   state.type == lexer.T_VAR then
+                    state, token = stackPush( stack, state, lexer.T_PAREN_CLOSE );
                 else
-                    return errstr( tag, 'unexpected symbol:' .. v );
-                end
-            -- found identifier
-            elseif k == lexer.T_VAR then
-                -- not member fields
-                if state.prev ~= '.' and state.prev ~= ':' then
-                    -- private ident
-                    if PRIVATE_IDEN[v] then
-                        return errstr( tag, 'cannot access to private variable:' .. v );
-                    -- to declare to local if identifier does not exists at environment
-                    elseif not ctx.env[v] then
-                        ctx.local_decl[v] = true;
-                    end
-                    state.iden = true;
-                end
-            -- found open-bracket
-            elseif v == '[' then
-                -- save current state
-                stack:push( state );
-                state = {
-                    iden = false;
-                };
-            -- found close-bracket
-            elseif v == ']' then
-                if #stack == 0 then
                     return errstr( tag, 'invalid syntax: ' .. v );
                 end
-                state = stack:pop();
-            -- found not member operator
-            elseif v ~= '.' then
-                state.iden = false;
-                -- disallow termination symbol
-                if v == ';' then
-                    return errstr( tag, 'invalid syntax: ' .. v );
+            elseif t == lexer.T_BRACKET_CLOSE or t == lexer.T_PAREN_CLOSE then
+                err, state, token, t, v = stackPop( stack, token, t, v );
+                if err then
+                    return errstr( tag, err );
                 end
             end
             
-            if skipContext then
-                skipContext = false;
-            else
-                state.prev = v;
-                token[idx] = v;
-            end
-            
-            idx = idx + 1;
+            state.prev = state.type;
+            state.type = t;
+            token.len = token.len + 1;
+            rawset( token.list, token.len, {
+                ['type'] = t,
+                val = v
+            });
         end
         
-        return nil, token, idx - 1;
+        -- check stack length
+        if stack.len ~= 1 then
+            return errstr( tag, 'invalid syntax: ' .. 
+                           rawget( token.list, token.len ).val );
+        end
+        
+        return nil, token.list, token.len;
     end
     
     return errstr( tag, 'too few arguments: ' .. tostring(expr) );
 end
+
+
+local function tokenConcat( token, len )
+    local expr = '';
+    local i;
+    
+    for i = 1, len do
+        expr = expr .. token[i].val;
+    end
+    
+    return expr;
+end
+
 
 -- generate source lines of code
 local VOIDTXT_TBL = {};
@@ -394,8 +467,8 @@ local function slocIf( ctx, tag )
     
     if not err then
         ctx.block_stack:push( tag );
-        appendCode( ctx, tag, 
-                    tag.name .. ' ' .. table.concat( token ) .. ' then' );
+        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
+                    ' then' );
     end
     
     return err;
@@ -406,8 +479,8 @@ local function slocElseif( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        appendCode( ctx, tag, 
-                    tag.name .. ' ' .. table.concat( token ) .. ' then' );
+        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
+                    ' then' );
     end
     
     return err;
@@ -419,8 +492,8 @@ local function slocDo( ctx, tag )
     
     if not err then
         ctx.block_stack:push( tag );
-        appendCode( ctx, tag, 
-                    tag.name .. ' ' .. table.concat( token ) .. ' do' );
+        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
+                    ' do' );
     end
     
     return err;
@@ -462,7 +535,7 @@ local function slocGoto( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            appendCode( ctx, tag, tag.name .. ' ' .. token[1] .. ';' );
+            appendCode( ctx, tag, tag.name .. ' ' .. token[1].val .. ';' );
         end
     end
     
@@ -477,7 +550,7 @@ local function slocLabel( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            appendCode( ctx, tag, '::' .. token[1] .. '::' );
+            appendCode( ctx, tag, '::' .. token[1].val .. '::' );
         end
     end
     
@@ -491,7 +564,7 @@ local function slocPut( ctx, tag )
     if not err then
         appendCode( ctx, tag,
                     '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( ' .. 
-                    table.concat( token ) .. ' );' );
+                    tokenConcat( token, len ) .. ' );' );
     end
     
     return err;
@@ -505,7 +578,7 @@ local function slocInsert( ctx, tag )
         if len ~= 1 then
             err = errstr( tag, 'invalid arguments' );
         else
-            local name = token[1]:match( '^[\'"](.*)[\'"]$' );
+            local name = token[1].val:match( '^[\'"](.*)[\'"]$' );
             
             if name then
                 ctx.insertions[name] = true;
@@ -514,7 +587,7 @@ local function slocInsert( ctx, tag )
             if not err then
                 appendCode( ctx, tag, 
                             '__RES__ = __RES__ .. __TSUKUYOMI__:render(' .. 
-                            token[1] .. ', __DATA__, false, __LABEL__ );' );
+                            token[1].val .. ', __DATA__, false, __LABEL__ );' );
             end
         end
     end
@@ -527,7 +600,7 @@ local function slocCode( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        appendCode( ctx, tag, table.concat( token ) .. ';' );
+        appendCode( ctx, tag, tokenConcat( token, len ) .. ';' );
     end
     
     return err;
@@ -551,7 +624,7 @@ local function slocCustom( ctx, tag )
     
     if not err then
         local cmd = ctx.cmds[tag.name];
-        local expr = table.concat( token );
+        local expr = tokenConcat( token, len );
         
         -- invoke custom command and output result
         if cmd.enableOutput then
