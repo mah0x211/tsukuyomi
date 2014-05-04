@@ -586,7 +586,7 @@ local function slocInsert( ctx, tag )
             
             if not err then
                 appendCode( ctx, tag, 
-                            '__RES__ = __RES__ .. __TSUKUYOMI__:render(' .. 
+                            '__RES__ = __RES__ .. __TSUKUYOMI__:_render(' .. 
                             token[1].val .. ', __DATA__, false, __LABEL__ );' );
             end
         end
@@ -726,7 +726,7 @@ end
 -- tsukuyomi instance methods(metatable)
 local tsukuyomi = {};
 
-function tsukuyomi:render( label, data, ignoreNil, parent )
+local function render( self, label, data, ignoreNil, parent )
     local success = false;
     local val;
     
@@ -762,6 +762,17 @@ function tsukuyomi:render( label, data, ignoreNil, parent )
             val = '[template:' .. label .. ' not found]';
         end
     end
+    
+    return val, success;
+end
+
+
+function tsukuyomi:render( label, data, ignoreNil )
+    local success, val;
+    
+    rawset( self, '_render', render );
+    val, success = render( self, label, data, ignoreNil );
+    rawset( self, '_render', nil );
     
     return val, success;
 end
