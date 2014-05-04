@@ -29,7 +29,9 @@ local PRIVATE_IDEN = {};
 PRIVATE_IDEN['_G'] = true;
 PRIVATE_IDEN['__TSUKUYOMI__'] = true;
 PRIVATE_IDEN['__RES__'] = true;
+PRIVATE_IDEN['__IDX__'] = true;
 PRIVATE_IDEN['__DATA__'] = true;
+PRIVATE_IDEN['__RAWSET__'] = true;
 
 -- change nil metatable
 local function nilIdx()
@@ -162,7 +164,7 @@ local function compile( ctx, env )
     end
     
     -- append return code
-    table.insert( ctx.code, 'return __RES__;' );
+    table.insert( ctx.code, 'return table.concat( __RES__ );' );
     
     -- add end mark of function block
     table.insert( ctx.code, 'end' );
@@ -444,6 +446,13 @@ local function appendCode( ctx, tag, code )
     end
 end
 
+
+local function resInsert( val )
+    return '__RAWSET__( __RES__, __IDX__, ' .. val .. 
+           ' ); __IDX__ = __IDX__ + 1;';
+end
+
+
 local function pushText( ctx, tail )
     -- void [\n, ', \]
     local voidtxt = string.gsub( 
@@ -453,12 +462,10 @@ local function pushText( ctx, tail )
     );
     local lineno, pos = linepos( ctx.txt, ctx.caret );
     
-    -- add tag index
     appendCode( ctx, {
         lineno = lineno,
         pos = pos
-    }, '__RES__ = __RES__ .. \'' .. voidtxt .. '\';' );
-
+    }, resInsert( '\'' .. voidtxt .. '\'' ) );
 end
 
 -- if
@@ -562,9 +569,8 @@ local function slocPut( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        appendCode( ctx, tag,
-                    '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( ' .. 
-                    tokenConcat( token, len ) .. ' );' );
+        appendCode( ctx, tag, resInsert( '__TSUKUYOMI__:tostring( ' .. 
+                    tokenConcat( token, len ) .. ' )' ) );
     end
     
     return err;
@@ -585,9 +591,9 @@ local function slocInsert( ctx, tag )
             end
             
             if not err then
-                appendCode( ctx, tag, 
-                            '__RES__ = __RES__ .. __TSUKUYOMI__:_render(' .. 
-                            token[1].val .. ', __DATA__, false, __LABEL__ );' );
+                appendCode( ctx, tag, resInsert( '(__TSUKUYOMI__:_render(' .. 
+                            token[1].val .. 
+                            ', __DATA__, false, __LABEL__, __RAWSET__ ))' ) );
             end
         end
     end
@@ -628,11 +634,9 @@ local function slocCustom( ctx, tag )
         
         -- invoke custom command and output result
         if cmd.enableOutput then
-            appendCode( 
-                ctx, tag, 
-                '__RES__ = __RES__ .. __TSUKUYOMI__:tostring( __TSUKUYOMI__.cmds["' .. 
-                cmd.name .. '"].fn(' .. expr .. ') );'
-            );
+            appendCode( ctx, tag, resInsert( 
+                        '__TSUKUYOMI__:tostring( __TSUKUYOMI__.cmds["' .. 
+                        cmd.name .. '"].fn(' .. expr .. ') )' ) );
         -- invoke custom command
         else
             appendCode( 
@@ -726,7 +730,7 @@ end
 -- tsukuyomi instance methods(metatable)
 local tsukuyomi = {};
 
-local function render( self, label, data, ignoreNil, parent )
+local function render( self, label, data, ignoreNil, parent, setFn )
     local success = false;
     local val;
     
@@ -736,7 +740,7 @@ local function render( self, label, data, ignoreNil, parent )
         val = '[' .. label .. ': circular insertion disallowed]';
     else
         local page = self.pages[label];
-        local res = '';
+        local res = {};
         
         if page then
             -- invoke script by coroutine
@@ -748,7 +752,8 @@ local function render( self, label, data, ignoreNil, parent )
             end
             
             co = coroutine.create( page.script );
-            success, val = coroutine.resume( co, self, res, data or {}, label );
+            success, val = coroutine.resume( co, self, res, 1, data or {}, 
+                                             label, setFn or rawset );
             
             -- disable ignore nil operation switch
             if ignoreNil then
@@ -864,7 +869,7 @@ local function tsukuyomi_read( t, label, txt, enableSourceMap )
             {
                 lineno = -1,
                 pos = 0,
-                token = 'return function( __TSUKUYOMI__, __RES__, __DATA__, __LABEL__ )'
+                token = 'return function( __TSUKUYOMI__, __RES__, __IDX__, __DATA__, __LABEL__, __RAWSET__ )'
             },
             {
                 lineno = -1,
