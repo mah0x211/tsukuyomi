@@ -898,7 +898,7 @@ local function tsukuyomi_read( t, label, txt, enableSourceMap )
         end
     end
     
-    return err, insertions;
+    return insertions, err;
 end
 
 return {
