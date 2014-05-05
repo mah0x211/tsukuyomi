@@ -58,7 +58,7 @@ local function readViewFile( tmpl, path )
             local enableSourceMap = true;
             local insertions;
             
-            err, insertions = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+            insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
             if not err then
                 for path in pairs( insertions ) do
                     readViewFile( tmpl, path );

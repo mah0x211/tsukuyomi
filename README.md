@@ -39,7 +39,7 @@ local function readViewFile( tmpl, path )
             local enableSourceMap = true;
             local insertions;
             
-            err, insertions = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+            insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
             if not err then
                 for path in pairs( insertions ) do
                     readViewFile( tmpl, path );
@@ -101,7 +101,7 @@ local sandbox = _G;
 local tmpl = tsukuyomi.new( sandbox );
 ```
 
-### err, ins = tsukuyomi.read( tmpl, label, src, enableSourceMap )
+### ins, err = tsukuyomi.read( tmpl, label, src, enableSourceMap )
 
 compile template strings and save to passed template object.
 
@@ -114,8 +114,8 @@ compile template strings and save to passed template object.
 
 **Returns**
 
-1. err: error string.
-2. ins: table that contains argument of insertion commands.
+1. ins: table that contains argument of insertion commands.
+2. err: error string.
 
 ```lua
 local path = 'README.md';
@@ -131,7 +131,7 @@ if fd then
         local enableSourceMap = true;
         local insertions;
         
-        err, insertions = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+        insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
         if not err then
             for path in pairs( insertions ) do
                 readViewFile( tmpl, path );
