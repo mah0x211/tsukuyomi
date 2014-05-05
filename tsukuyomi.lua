@@ -127,23 +127,21 @@ end
 
 
 -- generate error string
-local function errstr( tag, msg, label )
-    return '[line:' .. tag.lineno .. ':' .. tag.pos .. '' .. 
-            ( label and ':' .. label or '' ) .. '] ' .. 
-            ( msg or '' ) .. 
-            ( tag.token and ' ::' .. tag.token .. '::' or '' );
+local function errstr( label, tag, msg )
+    return '[' .. label .. ':line:' .. tag.lineno .. ':' .. tag.pos .. '] ' .. 
+            ( msg or '' ) .. ( tag.token and ' ::' .. tag.token .. '::' or '' );
 end
 
 
 -- generate error string with source mapping table
-local function errmap( srcmap, err, label )
+local function errmap( label, srcmap, err )
     -- find error position
     local idx, msg = string.match( err, ':(%d+):(.*)' );
     
     if idx then
         idx = tonumber( idx );
         if srcmap[idx] then
-            return errstr( srcmap[idx], msg, label );
+            return errstr( label, srcmap[idx], msg );
         end
     end
     
@@ -176,7 +174,7 @@ local function compile( ctx, env )
     -- got error
     if err then
         -- find error position
-        err = errmap( ctx.tag_decl, err );
+        err = errmap( ctx.label, ctx.tag_decl, err );
     else
         script = script();
     end
@@ -348,7 +346,7 @@ local function analyze( ctx, tag )
         
         for head, tail, t, v in lexer.scan( tag.expr ) do
             if t == lexer.T_EPAIR then
-                return errstr( tag, 'unexpected symbol: ' .. v );
+                return errstr( ctx.label, tag, 'unexpected symbol: ' .. v );
             elseif t == lexer.T_UNKNOWN then
                 -- found data variable prefix
                 -- not member fields
@@ -356,11 +354,11 @@ local function analyze( ctx, tag )
                     t = lexer.T_VAR;
                     v = '__DATA__';
                 else
-                    return errstr( tag, 'unexpected symbol: ' .. v );
+                    return errstr( ctx.label, tag, 'unexpected symbol: ' .. v );
                 end
             elseif t == lexer.T_KEYWORD then
                 if not ACCEPT_KEYS[v] then
-                    return errstr( tag, 'invalid keyword: ' .. v );
+                    return errstr( ctx.label, tag, 'invalid keyword: ' .. v );
                 end
             -- merge space
             elseif t == lexer.T_SPACE then
@@ -373,7 +371,8 @@ local function analyze( ctx, tag )
                     token.len = token.len - 1;
                 -- private ident
                 elseif PRIVATE_IDEN[v] then
-                    return errstr( tag, 'cannot access to private variable: ' .. v );
+                    return errstr( ctx.label, tag, 
+                                   'cannot access to private variable: ' .. v );
                 -- to declare to local if identifier does not exists at environment
                 elseif not ctx.env[v] then
                     ctx.local_decl[v] = true;
@@ -388,12 +387,12 @@ local function analyze( ctx, tag )
                    state.type == lexer.T_VAR then
                     state, token = stackPush( stack, state, lexer.T_PAREN_CLOSE );
                 else
-                    return errstr( tag, 'invalid syntax: ' .. v );
+                    return errstr( ctx.label, tag, 'invalid syntax: ' .. v );
                 end
             elseif t == lexer.T_BRACKET_CLOSE or t == lexer.T_PAREN_CLOSE then
                 err, state, token, t, v = stackPop( stack, token, t, v );
                 if err then
-                    return errstr( tag, err );
+                    return errstr( ctx.label, tag, err );
                 end
             end
             
@@ -408,14 +407,14 @@ local function analyze( ctx, tag )
         
         -- check stack length
         if stack.len ~= 1 then
-            return errstr( tag, 'invalid syntax: ' .. 
+            return errstr( ctx.label, tag, 'invalid syntax: ' .. 
                            rawget( token.list, token.len ).val );
         end
         
         return nil, token.list, token.len;
     end
     
-    return errstr( tag, 'too few arguments: ' .. tostring(expr) );
+    return errstr( ctx.label, tag, 'too few arguments: ' .. tostring(expr) );
 end
 
 
@@ -507,7 +506,7 @@ end
 
 -- else
 local function slocElse( ctx, tag )
-    local err = tag.expr and errstr( tag, 'invalid arguments' );
+    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
     
     if not err then
         appendCode( ctx, tag, tag.name );
@@ -518,11 +517,11 @@ end
 
 -- end
 local function slocEnd( ctx, tag )
-    local err = tag.expr and errstr( tag, 'invalid arguments' );
+    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
     
     if not err then
         if #ctx.block_stack < 1 then
-            err = errstr( tag, 'invalid statement' );
+            err = errstr( ctx.label, tag, 'invalid statement' );
         else
             ctx.block_stack:pop();
             ctx.block_break = false;
@@ -539,7 +538,7 @@ local function slocGoto( ctx, tag )
     
     if not err then
         if len ~= 1 then
-            err = errstr( tag, 'invalid arguments' );
+            err = errstr( ctx.label, tag, 'invalid arguments' );
         else
             appendCode( ctx, tag, tag.name .. ' ' .. token[1].val .. ';' );
         end
@@ -554,7 +553,7 @@ local function slocLabel( ctx, tag )
     
     if not err then
         if len ~= 1 then
-            err = errstr( tag, 'invalid arguments' );
+            err = errstr( ctx.label, tag, 'invalid arguments' );
         else
             appendCode( ctx, tag, '::' .. token[1].val .. '::' );
         end
@@ -581,7 +580,7 @@ local function slocInsert( ctx, tag )
     
     if not err then
         if len ~= 1 then
-            err = errstr( tag, 'invalid arguments' );
+            err = errstr( ctx.label, tag, 'invalid arguments' );
         else
             local name = token[1].val:match( '^[\'"](.*)[\'"]$' );
             
@@ -613,7 +612,7 @@ end
 
 -- break
 local function slocBreak( ctx, tag )
-    local err = tag.expr and errstr( tag, 'invalid arguments' );
+    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
     
     if not err then
         appendCode( ctx, tag, tag.name .. ';' );
@@ -677,7 +676,7 @@ local function parse( ctx )
         while tag do
             -- no close bracket: ?>
             if not tag.tail then
-                return errstr( tag, 'could not found closed-bracket' );
+                return errstr( ctx.label, tag, 'could not found closed-bracket' );
             -- push plain text
             elseif ctx.caret <= tag.head then
                 pushText( ctx, tag.head );
@@ -696,7 +695,7 @@ local function parse( ctx )
                     break;
                 end
             else
-                return errstr( tag, 'unknown expr: ' .. tag.name );
+                return errstr( ctx.label, tag, 'unknown expr: ' .. tag.name );
             end
             
             -- move caret
@@ -717,7 +716,7 @@ local function parse( ctx )
     end
     
     if not err and #ctx.block_stack > 0 then
-        return errstr( ctx.block_stack:pop(), 
+        return errstr( ctx.label, ctx.block_stack:pop(), 
                        'end of block statement not found' );
     end
     
@@ -760,7 +759,7 @@ local function render( self, label, data, ignoreNil, parent, setFn )
             end
             
             if not success and page.srcmap then
-                val = errmap( page.srcmap, val, label );
+                val = errmap( label, page.srcmap, val );
             end
         else
             val = '[template:' .. label .. ' not found]';
@@ -860,6 +859,7 @@ end
 -- read template context
 local function tsukuyomi_read( t, label, txt, enableSourceMap )
     local ctx = {
+        label = label,
         env = t.env or {},
         cmds = t.cmds,
         caret = 1,
