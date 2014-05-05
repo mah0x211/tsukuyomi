@@ -805,8 +805,13 @@ end
 -- class methods
 -- create instance
 local function tsukuyomi_new( env )
+    -- check arguments
+    if env ~= nil and type( env ) ~= 'table' then
+        error( 'sandbox environment must be type of table' );
+    end
+    
     return setmetatable({
-        env = ( type( env ) == 'table' ) and env or _G,
+        env = env or _G,
         cmds = {},
         pages = {}
     }, {
