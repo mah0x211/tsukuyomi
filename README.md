@@ -2,6 +2,20 @@
 
 tsukuyomi is the simple template engine written in pure Lua.
 
+## Installation
+
+```sh
+luarocks install --from=http://mah0x211.github.io/rocks/ tsukuyomi
+```
+
+or 
+
+```sh
+git clone https://github.com/mah0x211/tsukuyomi.git
+cd tsukuyomi
+luarocks make
+```
+
 ## Usage
 
 ```lua
