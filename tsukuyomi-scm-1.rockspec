@@ -14,7 +14,7 @@ build = {
     type = "builtin",
     modules = {
         tsukuyomi = "tsukuyomi.lua",
-        ['tsukuyomi.lexer'] = "lexer.lua"
+        ['tsukuyomi.lexer'] = "lib/lexer.lua"
     }
 }
 
