@@ -237,6 +237,7 @@ function Parser:parse( txt )
         
         -- push remain text
         if caret < len then
+            idx = idx + 1;
             rawset( tags, idx, txtTag( txt, caret, len ) );
         end
     end
