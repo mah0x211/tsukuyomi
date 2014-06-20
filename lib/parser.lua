@@ -111,7 +111,7 @@ end
 ]]
 local function findTag( tagOpen, tagClose, txt, len, caret )
     local head, htail = txt:find( tagOpen, caret );
-    local tag, tail, token;
+    local tag, tail, token, name, sym;
     
     -- found open bracket
     if head then
@@ -122,7 +122,16 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
         if tail then
             -- create tag struct
             tag.tail = tail;
-            tag.name = txt:sub( head + 2, htail );
+            -- separate helper command symbol
+            sym, name = txt:sub( head + 2, htail ):match( '^([%$]*)(.+)$' );
+            -- no symbol
+            if sym == '' then
+                rawset( tag, 'name', name );
+            else
+                rawset( tag, 'name', 'helper' );
+                rawset( tag, 'cmd', name );
+            end
+            
             token = txt:sub( htail + 1, tail - 2 );
             -- check expression
             if not token:find('^%s*$') then
