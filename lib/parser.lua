@@ -139,12 +139,10 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
                 if not token:find('^%s') then
                     rawset( tag, 'tail', nil );
                 else
-                    -- trim /^\s|\s$/g
-                    tag.expr = string.match( 
-                        -- remove \n
-                        string.gsub( token, '(\n+)', '' ),
-                        '([^%s].+[^%s])'
-                    );
+                    -- remove \n
+                    tag.expr = token:gsub( '(\n*)', '' )
+                                    -- trim /^\s|\s$/g
+                                    :match( '^%s*(.+)%s*$' );
                 end
             end
         end
