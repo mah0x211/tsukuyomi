@@ -35,11 +35,12 @@ end
 
 -- create template object
 local function createTemplate( sandbox )
-    local tmpl = tsukuyomi.new( sandbox );
+    local enableSourceMap = true;
+    local tmpl = tsukuyomi.new( enableSourceMap, sandbox );
     local enableOutput = true;
     
     -- register custom command $put
-    tsukuyomi.setCmd( tmpl, 'put', put, enableOutput );
+    tmpl:setCommand( 'put', put, enableOutput );
     
     return tmpl;
 end
@@ -55,10 +56,9 @@ local function readViewFile( tmpl, path )
         fd:close();
         if src then
             local label = path;
-            local enableSourceMap = true;
             local insertions;
             
-            insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+            insertions, err = tmpl:setPage( label, src );
             if not err then
                 for path in pairs( insertions ) do
                     readViewFile( tmpl, path );
