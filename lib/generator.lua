@@ -433,6 +433,7 @@ function Generator:helper_( ctx, tag )
     
 end
 
+
 local TMPL = [[local function %s( _TSUKUYOMI_, _RES_, _IDX_, _DATA_, _SETFN_ )
     %s
 %s
@@ -445,14 +446,12 @@ return %s;
 -- compile script
 local function compile( ctx )
     local name = ('GEN%s'):format( tostring(ctx):gsub( '^table: ', '' ) );
-    local localDecl = rawget( ctx, 'localDecl' );
-    local len;
+    local localDecl, len = util.table.keys( rawget( ctx, 'localDecl' ) );
     
-    -- append local variables
-    localDecl, len = util.table.keys( localDecl );
-    if len > 0 then
-        localDecl = ('local %s;'):format( table.concat( localDecl, ', ' ) );
-    end
+    -- create local variables declaration
+    localDecl = len > 0 and 
+                ('local %s;'):format( table.concat( localDecl, ', ' ) ) or
+                '';
     
     -- generate script source
     return TMPL:format( name, localDecl, table.concat( ctx.code, '\n' ), name );
