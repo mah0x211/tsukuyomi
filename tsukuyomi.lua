@@ -24,14 +24,16 @@
     THE SOFTWARE.
 
 --]]
-local lexer = require('tsukuyomi.lexer');
-local PRIVATE_IDEN = {};
-PRIVATE_IDEN['_G'] = true;
-PRIVATE_IDEN['__TSUKUYOMI__'] = true;
-PRIVATE_IDEN['__RES__'] = true;
-PRIVATE_IDEN['__IDX__'] = true;
-PRIVATE_IDEN['__DATA__'] = true;
-PRIVATE_IDEN['__RAWSET__'] = true;
+-- class methods
+local halo = require('halo');
+local coNew = coroutine.create;
+local coResume = coroutine.resume;
+local eval = require('util').eval;
+local typeof = require('util.typeof');
+local Parser = require('tsukuyomi.parser');
+local Generator = require('tsukuyomi.generator');
+local Tsukuyomi = halo.class.Tsukuyomi;
+
 
 -- change nil metatable
 local function nilIdx()
@@ -71,61 +73,6 @@ local function ignoreNilOps( ignore )
 end
 
 
--- Stack class(metatable)
-local Stack = {};
-
--- methods
-function Stack:push( arg )
-    table.insert( self, arg );
-end
-
-
-function Stack:pop()
-    return table.remove( self );
-end
-
-
--- create Stack instance
-function Stack.new()
-    return setmetatable( {}, {
-        __index = Stack
-    });
-end
-
-
-local function tableKeys( tbl )
-    local list = {};
-    local idx = 1;
-    for k in pairs( tbl ) do
-        list[idx] = k;
-        idx = idx + 1;
-    end
-    
-    return list, idx - 1;
-end
-
-
--- find lineno and position
-local function linepos( src, head )
-    local str = src:sub( 1, head );
-    local originHead = head;
-    local lineno = 1;
-    local pos = 1;
-    local tail;
-    
-    head, tail = string.find( str, '\n', 1, true );
-    
-    while head do
-        pos = tail;
-        lineno = lineno + 1;
-        head, tail = string.find( str, '\n', tail + 1, true );
-    end
-    pos = originHead - pos;
-    
-    return lineno, pos;
-end
-
-
 -- generate error string
 local function errstr( label, tag, msg )
     return '[' .. label .. ':line:' .. tag.lineno .. ':' .. tag.pos .. '] ' .. 
@@ -149,609 +96,140 @@ local function errmap( label, srcmap, err )
 end
 
 
--- compile script
-local function compile( ctx, env )
-    local src, script, err, msg, len;
-    
-    -- append local variables
-    ctx.local_decl, len = tableKeys( ctx.local_decl );
-    if len > 0 then
-        ctx.tag_decl[2].token = 'local ' .. table.concat( ctx.local_decl, ', ' ) .. ';';
-        ctx.code[2] = ctx.tag_decl[2].token;
-    end
-    
-    -- append return code
-    table.insert( ctx.code, 'return table.concat( __RES__ );' );
-    
-    -- add end mark of function block
-    table.insert( ctx.code, 'end' );
-    
-    -- generate script source
-    src = table.concat( ctx.code, '\n' );
-    
-    -- compile
-    script, err = load( src, src, 't', env );
-    -- got error
-    if err then
-        -- find error position
-        err = errmap( ctx.label, ctx.tag_decl, err );
-    else
-        script = script();
-    end
-    
-    return err, script;
-end
-
-
--- tag parser
-local SYM_QUOT = {
-    ['\''] = true,
-    ['"'] = true
+Tsukuyomi:property {
+    public = {
+        enableSourceMap = true,
+        commands = {},
+        pages = {},
+        status = {}
+    }
 };
 
-
-local function findTagClose( txt, len, cur )
-    local c, idx, head, tail;
+-- create instance
+function Tsukuyomi:init( enableSourceMap, env )
+    local cfg = protected( self );
     
-    -- search close bracket ?>:[0x3F][0x3E]
-    while cur < len do
-        c = txt:sub( cur, cur );
-        -- check literal-bracket(double-bracket)
-        if c == '[' then
-            head, tail = txt:find( '^%[=*%[', cur );
-            -- found open literal-bracket
-            if head then
-                -- find close literal-bracket
-                c = txt:sub( head, tail ):gsub( '%[', '%]' );
-                head, tail = txt:find( c, tail + 1, true );
-                -- invalid syntax
-                if not head then
-                    break;
-                end
-                -- skip literal bracket
-                cur = tail + 1;
-            -- move to next index
-            else
-                cur = cur + 1;
-            end
-        -- found quot: [", '] and not escape sequence: [\] at front
-        elseif SYM_QUOT[c] and txt:byte( cur - 1 ) ~= 0x5C then
-            head, tail = txt:find( '[^\\]' .. c, cur );
-            -- invalid syntax
-            if not head then
-                break;
-            end
-            -- skip quot
-            cur = tail + 1;
-        -- found close bracket
-        elseif c == '?' and txt:byte( cur + 1 ) == 0x3E then
-            return cur + 1;
-        -- move to next index
-        else
-            cur = cur + 1;
-        end
-    end
-    
-    return nil;
-end
-
-
-local function findTag( ctx )
-    local txt = ctx.txt;
-    local head, tail = string.find( txt, '<%?[$%l%u]', ctx.caret );
-    local tag, word;
-    
-    -- found open bracket
-    if head then
-        tag = { head = head - 1 };
-        tag.lineno, tag.pos = linepos( txt, tag.head );
-        tail = findTagClose( txt, ctx.length, tail + 1 );
-        -- found close bracket
-        if tail then
-            -- create tag struct
-            tag.tail = tail;
-            -- trim /^\s|\s$/g
-            tag.token = string.match( 
-                -- remove \n
-                string.gsub( txt:sub( head + 2, tail - 2 ), '(\n+)', '' ),
-                '([^%s].+[^%s])'
-            );
-            -- separate NAME, SP, EXPR
-            tag.name, word, tag.expr = string.match( tag.token, '^([$]?[%l%u]+)(%s*)(.*)' );
-            -- set nil to empty
-            if tag.expr == '' then
-                tag.expr = nil;
-            end
-        end
-    end
-    
-    return tag;
-end
-
-
--- analyze
-local ACCEPT_KEYS = {};
-ACCEPT_KEYS['in'] = true;
-ACCEPT_KEYS['nil'] = true;
-ACCEPT_KEYS['true'] = true;
-ACCEPT_KEYS['false'] = true;
-
-
-local function stackPush( stack, state, t )
-    local token = {
-        list = {},
-        len = 0
-    };
-    
-    state.type = t;
-    state = {
-        token = token
-    };
-    stack.len = stack.len + 1;
-    rawset( stack.list, stack.len, state );
-    
-    return state, token;
-end
-
-
-local function stackPop( stack, token, t, v )
-    local state = stack.len > 1 and rawget( stack.list, stack.len - 1 ) or nil;
-    
-    if not state or state.type ~= t then
-        return 'unexpected symbol: ' .. v;
+    -- check arguments
+    if env ~= nil then
+        assert(
+            typeof.table( env ), 
+            'environment must be type of table' 
+        );
+        rawset( self, 'env', env );
     else
-        local tmp = '';
-        
-        -- merge current tokens
-        table.foreach( token.list, function( idx, item )
-            tmp = tmp .. item.val;
-        end);
-        v = tmp .. v;
-        
-        -- append to prev token
-        token = state.token;
-        if token.len > 0 then
-            tmp = token.list[token.len];
-            if tmp.type == lexer.T_VAR then
-                t = tmp.type;
-                v = tmp.val .. v;
-                token.len = token.len - 1;
-            end
-        end
-        
-        -- remove current stack
-        rawset( stack.list, stack.len, nil );
-        stack.len = stack.len - 1;
-        
-        return nil, state, token, t, v;
+        rawset( self, 'env', _G );
     end
+    
+    if enableSourceMap ~= nil then
+        assert(
+            typeof.boolean( enableSourceMap ),
+            'enableSourceMap must be type of boolean' 
+        );
+        rawset( self, 'enableSourceMap', enableSourceMap );
+    end
+    
+    rawset( self, 'parser', Parser.new() );
+    rawset( self, 'generator', Generator.new() );
+    
+    return self;
 end
 
 
---TODO: should check tag context.
-local function analyze( ctx, tag )
-    if tag.expr then
-        local token = {
-            list = {},
-            len = 0
-        };
-        local state = {
-            token = token
-        };
-        local stack = {
-            list = { state },
-            len = 1
-        }
-        local head, tail, t, v, err;
-        
-        for head, tail, t, v in lexer.scan( tag.expr ) do
-            if t == lexer.T_EPAIR then
-                return errstr( ctx.label, tag, 'unexpected symbol: ' .. v );
-            elseif t == lexer.T_UNKNOWN then
-                -- found data variable prefix
-                -- not member fields
-                if v == '$' then
-                    t = lexer.T_VAR;
-                    v = '__DATA__';
-                else
-                    return errstr( ctx.label, tag, 'unexpected symbol: ' .. v );
-                end
-            elseif t == lexer.T_KEYWORD then
-                if not ACCEPT_KEYS[v] then
-                    return errstr( ctx.label, tag, 'invalid keyword: ' .. v );
-                end
-            -- merge space
-            elseif t == lexer.T_SPACE then
-                t = state.type;
-                v = token.list[token.len].val .. v;
-                token.len = token.len - 1;
-            elseif t == lexer.T_VAR then
-                if state.type == lexer.T_MEMBER then
-                    v = token.list[token.len].val .. v;
-                    token.len = token.len - 1;
-                -- private ident
-                elseif PRIVATE_IDEN[v] then
-                    return errstr( ctx.label, tag, 
-                                   'cannot access to private variable: ' .. v );
-                -- to declare to local if identifier does not exists at environment
-                elseif not ctx.env[v] then
-                    ctx.local_decl[v] = true;
-                end
-            elseif t == lexer.T_MEMBER then
-                v = token.list[token.len].val .. v;
-                token.len = token.len - 1;
-            elseif t == lexer.T_BRACKET_OPEN then
-                state, token = stackPush( stack, state, lexer.T_BRACKET_CLOSE );
-            elseif t == lexer.T_PAREN_OPEN then
-                if not state.type or state.type == lexer.T_OPERATOR or 
-                   state.type == lexer.T_VAR then
-                    state, token = stackPush( stack, state, lexer.T_PAREN_CLOSE );
-                else
-                    return errstr( ctx.label, tag, 'invalid syntax: ' .. v );
-                end
-            elseif t == lexer.T_BRACKET_CLOSE or t == lexer.T_PAREN_CLOSE then
-                err, state, token, t, v = stackPop( stack, token, t, v );
-                if err then
-                    return errstr( ctx.label, tag, err );
-                end
-            end
-            
-            state.prev = state.type;
-            state.type = t;
-            token.len = token.len + 1;
-            rawset( token.list, token.len, {
-                ['type'] = t,
-                val = v
+-- set custom user command
+function Tsukuyomi:setCommand( name, fn, enableOutput )
+    assert(
+        type( name ) == 'string',
+        'name must be type of string' 
+    );
+    assert(
+        string.len( name ) > 0,
+        'name must not be empty string' 
+    );
+    assert(
+        type( fn ) == 'function',
+        'fn must be type of function' 
+    );
+    assert(
+        typeof.boolean( enableOutput ),
+        'enableOutput must be type of boolean' 
+    );
+    
+    -- set custom command
+    rawset( self.commands, name, {
+        fn = fn,
+        enableOutput = enableOutput
+    });
+end
+
+
+-- unset custom user command
+function Tsukuyomi:unsetCommand( name )
+    rawset( self.commands, name, nil );
+end
+
+
+function Tsukuyomi:setPage( label, txt )
+    local tags, ntag = self.parser:parse( txt );
+    local src, ins, err, tag = self.generator:make( tags, ntag, self.env, self.commands );
+    
+    -- parse text
+    if not err then
+        -- compile
+        src, err = eval( src, self.env );
+        -- create readable error message
+        if err then
+            err = errmap( label, tags, err );
+        -- add page
+        else
+            rawset( self.pages, label, {
+                script = src(),
+                srcmap = self.enableSourceMap and tags or nil
             });
         end
-        
-        -- check stack length
-        if stack.len ~= 1 then
-            return errstr( ctx.label, tag, 'invalid syntax: ' .. 
-                           rawget( token.list, token.len ).val );
-        end
-        
-        return nil, token.list, token.len;
+    else
+        err = errstr( label, tag, err ); 
     end
     
-    return errstr( ctx.label, tag, 'too few arguments: ' .. tostring(expr) );
+    return ins, err;
 end
 
 
-local function tokenConcat( token, len )
-    local expr = '';
-    local i;
-    
-    for i = 1, len do
-        expr = expr .. token[i].val;
-    end
-    
-    return expr;
-end
-
-
--- generate source lines of code
-local VOIDTXT_TBL = {};
-VOIDTXT_TBL['\n'] = '\\n';
-VOIDTXT_TBL['\''] = '\\\'';
-VOIDTXT_TBL['\\'] = '\\\\';
-
-local function appendCode( ctx, tag, code )
-    -- ignore source code if block_break is true.
-    if not ctx.block_break then
-        table.insert( ctx.tag_decl, tag );
-        table.insert( ctx.code, code );
-    end
-end
-
-
-local function resInsert( val )
-    return '__RAWSET__( __RES__, __IDX__, ' .. val .. 
-           ' ); __IDX__ = __IDX__ + 1;';
-end
-
-
-local function pushText( ctx, tail )
-    -- void [\n, ', \]
-    local voidtxt = string.gsub( 
-        ctx.txt:sub( ctx.caret, tail ), 
-        '[\n\'\\]', 
-        VOIDTXT_TBL 
+function Tsukuyomi:unsetPage( label )
+    assert(
+        typeof.string( label ),
+        'label must be type of string' 
     );
-    local lineno, pos = linepos( ctx.txt, ctx.caret );
     
-    appendCode( ctx, {
-        lineno = lineno,
-        pos = pos
-    }, resInsert( '\'' .. voidtxt .. '\'' ) );
-end
-
--- if
-local function slocIf( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        ctx.block_stack:push( tag );
-        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
-                    ' then' );
-    end
-    
-    return err;
-end
-
--- elseif
-local function slocElseif( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
-                    ' then' );
-    end
-    
-    return err;
-end
-
--- do: for, while
-local function slocDo( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        ctx.block_stack:push( tag );
-        appendCode( ctx, tag, tag.name .. ' ' .. tokenConcat( token, len ) .. 
-                    ' do' );
-    end
-    
-    return err;
-end
-
--- else
-local function slocElse( ctx, tag )
-    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
-    
-    if not err then
-        appendCode( ctx, tag, tag.name );
-    end
-    
-    return err;
-end
-
--- end
-local function slocEnd( ctx, tag )
-    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
-    
-    if not err then
-        if #ctx.block_stack < 1 then
-            err = errstr( ctx.label, tag, 'invalid statement' );
-        else
-            ctx.block_stack:pop();
-            ctx.block_break = false;
-            appendCode( ctx, tag, tag.name );
-        end
-    end
-    
-    return err;
-end
-
--- goto
-local function slocGoto( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        if len ~= 1 then
-            err = errstr( ctx.label, tag, 'invalid arguments' );
-        else
-            appendCode( ctx, tag, tag.name .. ' ' .. token[1].val .. ';' );
-        end
-    end
-    
-    return err;
-end
-
--- label
-local function slocLabel( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        if len ~= 1 then
-            err = errstr( ctx.label, tag, 'invalid arguments' );
-        else
-            appendCode( ctx, tag, '::' .. token[1].val .. '::' );
-        end
-    end
-    
-    return err;
-end
-
--- put
-local function slocPut( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        appendCode( ctx, tag, resInsert( '__TSUKUYOMI__:tostring( ' .. 
-                    tokenConcat( token, len ) .. ' )' ) );
-    end
-    
-    return err;
-end
-
--- insert
-local function slocInsert( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        if len ~= 1 then
-            err = errstr( ctx.label, tag, 'invalid arguments' );
-        else
-            local name = token[1].val:match( '^[\'"](.*)[\'"]$' );
-            
-            if name then
-                ctx.insertions[name] = true;
-            end
-            
-            if not err then
-                appendCode( ctx, tag, resInsert( '(__TSUKUYOMI__:_render(' .. 
-                            token[1].val .. 
-                            ', __DATA__, false, __LABEL__, __RAWSET__ ))' ) );
-            end
-        end
-    end
-    
-    return err;
-end
-
--- code
-local function slocCode( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        appendCode( ctx, tag, tokenConcat( token, len ) .. ';' );
-    end
-    
-    return err;
-end
-
--- break
-local function slocBreak( ctx, tag )
-    local err = tag.expr and errstr( ctx.label, tag, 'invalid arguments' );
-    
-    if not err then
-        appendCode( ctx, tag, tag.name .. ';' );
-        ctx.block_break = true;
-    end
-    
-    return err;
-end
-
--- custom command
-local function slocCustom( ctx, tag )
-    local err, token, len = analyze( ctx, tag );
-    
-    if not err then
-        local cmd = ctx.cmds[tag.name];
-        local expr = tokenConcat( token, len );
-        
-        -- invoke custom command and output result
-        if cmd.enableOutput then
-            appendCode( ctx, tag, resInsert( 
-                        '__TSUKUYOMI__:tostring( __TSUKUYOMI__.cmds["' .. 
-                        cmd.name .. '"].fn(' .. expr .. ') )' ) );
-        -- invoke custom command
-        else
-            appendCode( 
-                ctx, tag,
-                '__TSUKUYOMI__.cmds["' .. cmd.name .. '"].fn(' .. expr .. ');'
-            );
-        end
-    end
-    
-    return err;
-    
-end
-
-local SLOC = {};
-SLOC['if'] = slocIf;
-SLOC['elseif'] = slocElseif;
-SLOC['else'] = slocElse;
-SLOC['for'] = slocDo;
-SLOC['while'] = slocDo;
-SLOC['break'] = slocBreak;
-SLOC['end'] = slocEnd;
-SLOC['goto'] = slocGoto;
-SLOC['label'] = slocLabel;
--- custom tags
-SLOC['put'] = slocPut;
-SLOC['insert'] = slocInsert;
-SLOC['code'] = slocCode;
-
--- read template context
-local function parse( ctx )
-    local err;
-    
-    if ctx.length ~= '' then
-        local code = ctx.code;
-        local tag, sloc;
-        
-        -- find tag
-        tag = findTag( ctx );
-        while tag do
-            -- no close bracket: ?>
-            if not tag.tail then
-                return errstr( ctx.label, tag, 'could not found closed-bracket' );
-            -- push plain text
-            elseif ctx.caret <= tag.head then
-                pushText( ctx, tag.head );
-            end
-            
-            -- get handler
-            sloc = SLOC[tag.name];
-            -- check custom command list
-            if not sloc and ctx.cmds[tag.name] then
-                sloc = slocCustom;
-            end
-            
-            if sloc then
-                err = sloc( ctx, tag );
-                if err then
-                    break;
-                end
-            else
-                return errstr( ctx.label, tag, 'unknown expr: ' .. tag.name );
-            end
-            
-            -- move caret
-            ctx.caret = tag.tail + 1;
-            -- remove index and expr
-            tag.name = nil;
-            tag.expr = nil;
-            tag.head = nil;
-            tag.tail = nil;
-            -- find next tag
-            tag = findTag( ctx );
-        end
-        
-        -- push remain text
-        if not err and ctx.caret < ctx.length then
-            pushText( ctx, ctx.length );
-        end
-    end
-    
-    if not err and #ctx.block_stack > 0 then
-        return errstr( ctx.label, ctx.block_stack:pop(), 
-                       'end of block statement not found' );
-    end
-    
-    return err;
+    rawset( self.pages, label, nil );
 end
 
 
-
--- tsukuyomi instance methods(metatable)
-local tsukuyomi = {};
-
-local function render( self, label, data, ignoreNil, parent, setFn )
-    local success = false;
-    local val;
+function Tsukuyomi:render( label, data, ignoreNil )
+    local status = rawget( self, 'status' );
+    local success, val;
     
     if type( label ) ~= 'string' then
-        val = '[label must be type of string: ' .. tostring(label) .. ']';
-    elseif label == parent then
-        val = '[' .. label .. ': circular insertion disallowed]';
+        val = ('[label must be type of string: %q]'):format( tostring(label) );
+    elseif rawget( status, label ) ~= nil then
+        val = ('[%q: circular insertion disallowed]'):format( label );
     else
-        local page = self.pages[label];
-        local res = {};
+        local page = rawget( self.pages, label );
         
-        if page then
+        if not page then
+            val = ('[template: %q not found]'):format( label );
+        else
             -- invoke script by coroutine
-            local co;
+            local res = {};
+            local co = coNew( page.script );
             
             -- enable ignore nil operation switch
             if ignoreNil then
                 ignoreNilOps( true );
             end
             
-            co = coroutine.create( page.script );
-            success, val = coroutine.resume( co, self, res, 1, data or {}, 
-                                             label, setFn or rawset );
+            rawset( status, label, true );
+            success, val = coResume( co, self, res, 1, data or {}, rawset );
+            rawset( status, label, nil );
             
             -- disable ignore nil operation switch
             if ignoreNil then
@@ -761,27 +239,13 @@ local function render( self, label, data, ignoreNil, parent, setFn )
             if not success and page.srcmap then
                 val = errmap( label, page.srcmap, val );
             end
-        else
-            val = '[template:' .. label .. ' not found]';
         end
     end
     
     return val, success;
 end
 
-
-function tsukuyomi:render( label, data, ignoreNil )
-    local success, val;
-    
-    rawset( self, '_render', render );
-    val, success = render( self, label, data, ignoreNil );
-    rawset( self, '_render', nil );
-    
-    return val, success;
-end
-
-
-function tsukuyomi:tostring( ... )
+function Tsukuyomi:tostring( ... )
     local res = '';
     local i,v,t;
     
@@ -801,114 +265,5 @@ function tsukuyomi:tostring( ... )
 end
 
 
--- class methods
--- create instance
-local function tsukuyomi_new( env )
-    -- check arguments
-    if env ~= nil and type( env ) ~= 'table' then
-        error( 'sandbox environment must be type of table' );
-    end
-    
-    return setmetatable({
-        env = env or _G,
-        cmds = {},
-        pages = {}
-    }, {
-        __index = tsukuyomi
-    });
-end
+return Tsukuyomi.exports;
 
-
-local PREFIX_CMD = '$';
--- set custom user command
-local function tsukuyomi_cmd_set( t, cmd, fn, enableOutput )
-    if type( cmd ) ~= 'string' then
-        error( 'invalid argument: cmd must be type of string' );
-    elseif type( fn ) ~= 'function' then
-        error( 'invalid argument: fn must be type of function' );
-    end
-    
-    -- set custom command prefix
-    cmd = PREFIX_CMD .. cmd;
-    if t.cmds[cmd] then
-        error( 'invalid argument: ' .. cmd .. ' already exists' );
-    -- set custom command
-    else
-        t.cmds[cmd] = {
-            name = cmd,
-            fn = fn,
-            enableOutput = enableOutput and true or false
-        };
-    end
-end
-
--- unset custom user command
-local function tsukuyomi_cmd_unset( t, cmd )
-    if type( cmd ) == 'string' then
-        t.cmds[PREFIX_CMD .. cmd] = nil;
-    end
-end
-
--- remove template context
-local function tsukuyomi_remove( t, label )
-    if t.pages[label] then
-        t.pages[label] = nil;
-    end
-end
-
--- read template context
-local function tsukuyomi_read( t, label, txt, enableSourceMap )
-    local ctx = {
-        label = label,
-        env = t.env or {},
-        cmds = t.cmds,
-        caret = 1,
-        txt = txt,
-        length = string.len( txt ),
-        code = {},
-        local_decl = {},
-        insertions = {},
-        block_stack = Stack.new(),
-        tag_decl = {
-            {
-                lineno = -1,
-                pos = 0,
-                token = 'return function( __TSUKUYOMI__, __RES__, __IDX__, __DATA__, __LABEL__, __RAWSET__ )'
-            },
-            {
-                lineno = -1,
-                pos = 0,
-                token = ''
-            }
-        }
-    };
-    local script, err, insertions;
-    
-    ctx.code[1] = ctx.tag_decl[1].token;
-    ctx.code[2] = ctx.tag_decl[2].token;
-    
-    -- parse text
-    err = parse( ctx );
-    if not err then
-        -- compile context
-        err, script = compile( ctx, t.env );
-        if not err then
-            -- add page
-            t.pages[label] = {
-                script = script,
-                srcmap = enableSourceMap and ctx.tag_decl or nil
-            };
-            insertions = ctx.insertions;
-        end
-    end
-    
-    return insertions, err;
-end
-
-return {
-    new = tsukuyomi_new,
-    remove = tsukuyomi_remove,
-    read = tsukuyomi_read,
-    setCmd = tsukuyomi_cmd_set,
-    unsetCmd = tsukuyomi_cmd_unset
-};
