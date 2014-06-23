@@ -373,15 +373,16 @@ function Generator:insert_( ctx, tag )
         if len ~= 1 then
             err = 'invalid arguments';
         else
+            -- extract static insertion string
             local name = token[1].val:match( '^[\'"](.*)[\'"]$' );
-            
+            -- save static insertion string
             if name then
                 ctx.insertions[name] = true;
             end
             
             appendCode( ctx, resInsert( 
-                ('(_TSUKUYOMI_:render( %q, _DATA_, false ))')
-                :format( tostring(name) )
+                ('(_TSUKUYOMI_:render( %s, _DATA_, false ))')
+                :format( token[1].val )
             ));
         end
     end
