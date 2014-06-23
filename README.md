@@ -16,6 +16,11 @@ cd tsukuyomi
 luarocks make
 ```
 
+## Dependencies
+
+- lua-halo: https://github.com/mah0x211/lua-halo
+- lua-util: https://github.com/mah0x211/lua-util
+
 ## Usage
 
 ```lua
@@ -30,11 +35,12 @@ end
 
 -- create template object
 local function createTemplate( sandbox )
-    local tmpl = tsukuyomi.new( sandbox );
+    local enableSourceMap = true;
+    local tmpl = tsukuyomi.new( enableSourceMap, sandbox );
     local enableOutput = true;
     
     -- register custom command $put
-    tsukuyomi.setCmd( tmpl, 'put', put, enableOutput );
+    tmpl:setCommand( 'put', put, enableOutput );
     
     return tmpl;
 end
@@ -50,10 +56,9 @@ local function readViewFile( tmpl, path )
         fd:close();
         if src then
             local label = path;
-            local enableSourceMap = true;
             local insertions;
             
-            insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
+            insertions, err = tmpl:setPage( label, src );
             if not err then
                 for path in pairs( insertions ) do
                     readViewFile( tmpl, path );
@@ -94,14 +99,15 @@ readViewFile( tmpl, viewFile );
 renderTemplate( tmpl, viewFile, data );
 ```
 
-## Functions
-
-### tmpl = tsukuyomi.new( sandbox )
+## Create Object
 
 create new template object.
 
+### tmpl = tsukuyomi.new( [enableSourceMap [, sandbox]] )
+
 **Parameters**
 
+- enableSourceMap: append line number of the source code to error messages. (default true)
 - sandbox: sandbox table. (default _G)
 
 **Returns**
@@ -111,20 +117,19 @@ create new template object.
 
 ```lua
 local tsukuyomi = require('tsukuyomi');
-local sandbox = _G;
-local tmpl = tsukuyomi.new( sandbox );
+local tmpl = tsukuyomi.new();
 ```
 
-### ins, err = tsukuyomi.read( tmpl, label, src, enableSourceMap )
+## Set/Unset Template
 
-compile template strings and save to passed template object.
+### ins, err = tmpl:setPage( label, src )
+
+compile the passed template strings and set the generated function to tmpl object.
 
 **Parameters**
 
-- tmpl: template object.
 - label: label string for associate to the compiled template.
 - src: source strings of template.
-- enableSourceMap: append line number of the source code to error messages if true.
 
 **Returns**
 
@@ -132,59 +137,59 @@ compile template strings and save to passed template object.
 2. err: error string.
 
 ```lua
-local path = 'README.md';
-local fd, err = io.open( path );
-    
-if fd then
-    local src;
-    
-    src, err = fd:read('*a');
-    fd:close();
-    if src then
-        local label = path;
-        local enableSourceMap = true;
-        local insertions;
+local tsukuyomi = require('tsukuyomi');
+
+local function readViewFile( tmpl, path )
+    local fd, err = io.open( path );
+    if fd then
+        local src;
         
-        insertions, err = tsukuyomi.read( tmpl, label, src, enableSourceMap );
-        if not err then
-            for path in pairs( insertions ) do
-                readViewFile( tmpl, path );
+        src, err = fd:read('*a');
+        fd:close();
+        if src then
+            local label = path;
+            local insertions;
+            
+            insertions, err = tmpl:setPage( label, src );
+            if not err then
+                for path in pairs( insertions ) do
+                    readViewFile( tmpl, path );
+                end
             end
         end
     end
+    
+    if err then
+        print( err );
+    end
 end
 
-if err then
-    print( err );
-end
+local tmpl = tsukuyomi.new();
+readViewFile( tmpl, 'README.md' );
 ```
 
-
-### tsukuyomi.remove( tmpl, label )
+### tmpl:unsetPage( label )
 
 remove the compiled template that associated with the label argument.
 
 **Parameters**
 
-- tmpl: template object.
-- label: label string.
-
+- label: string.
 
 ```lua
-local label = 'README.md';
-tsukuyomi.remove( tmpl, label );
+tmpl:unsetPage( 'README.md' );
 ```
 
+## Set/Unset Custom Template Command
 
-### tsukuyomi.setCmd( tmpl, name, func, enableOutput )
+### tmpl:setCommand( name, func, enableOutput )
 
-register custom template command.
+register custom template command (aka helper command).
 
 **Parameters**
 
-- tmpl: template object.
 - name: name of custom command.
-- func: custom command implementation.
+- func: custom command implementation (function).
 - enableOutput: render the return value if true.
 
 ```lua
@@ -196,18 +201,15 @@ local function put( ... )
 end
 
 -- register custom command $put
-local enableOutput = true;
-tsukuyomi.setCmd( tmpl, 'put', put, enableOutput );
+tmpl:setCommand( 'put', put, true );
 ```
 
-
-### tsukuyomi.unsetCmd( tmpl, name )
+### tmpl:unsetCommand( name )
 
 unregister custom template command.
 
 **Parameters**
 
-- tmpl: template object.
 - name: name of custom command.
 
 ```lua
@@ -215,7 +217,7 @@ unregister custom template command.
 tsukuyomi.unsetCmd( tmpl, 'put' );
 ```
 
-## Methods
+## Render The Template.
 
 ### res, success = tmpl:render( label, data, ignoreNil )
 
