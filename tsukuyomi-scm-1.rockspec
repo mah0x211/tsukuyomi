@@ -10,11 +10,18 @@ description = {
     license = "MIT/X11",
     maintainer = "Masatoshi Teruya"
 }
+dependencies = {
+    "lua >= 5.1",
+    "util",
+    "halo"
+}
 build = {
     type = "builtin",
     modules = {
         tsukuyomi = "tsukuyomi.lua",
-        ['tsukuyomi.lexer'] = "lib/lexer.lua"
+        ['tsukuyomi.lexer'] = "lib/lexer.lua",
+        ['tsukuyomi.parser'] = "lib/parser.lua",
+        ['tsukuyomi.generator'] = "lib/generator.lua"
     }
 }
 
