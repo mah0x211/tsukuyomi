@@ -152,7 +152,7 @@ local function analyze( ctx, tag )
                 state, token = stackPush( stack, state, lexer.T_BRACKET_CLOSE );
             elseif t == lexer.T_PAREN_OPEN then
                 if not state.type or state.type == lexer.T_OPERATOR or 
-                   state.type == lexer.T_VAR then
+                   state.type == lexer.T_VAR or state.type == lexer.T_PAREN_OPEN then
                     state, token = stackPush( stack, state, lexer.T_PAREN_CLOSE );
                 else
                     return ('invalid syntax: %q'):format( v );
