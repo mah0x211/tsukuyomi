@@ -86,7 +86,15 @@ local function errmap( label, srcmap, err )
     local idx, msg = string.match( err, ':(%d+):(.*)' );
     
     if idx then
-        idx = tonumber( idx );
+        --
+        -- NOTE: should subtract 2 from line-number because code generator will
+        --       generate the code as below;
+        --
+        --         first-line: function declaration.
+        --         second-line: variable declaration.
+        --         and, logic code...
+        --
+        idx = tonumber( idx ) - 2;
         if srcmap[idx] then
             return errstr( label, srcmap[idx], msg );
         end
