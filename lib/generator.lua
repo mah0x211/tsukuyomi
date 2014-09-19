@@ -58,7 +58,7 @@ local function stackPop( stack, token, t, v )
         local tmp = '';
         
         -- merge current tokens
-        table.foreach( token.list, function( idx, item )
+        table.foreach( token.list, function( _, item )
             tmp = tmp .. item.val;
         end);
         v = tmp .. v;
@@ -111,9 +111,9 @@ local function analyze( ctx, tag )
             list = { state },
             len = 1
         }
-        local head, tail, t, v, err;
+        local err;
         
-        for head, tail, t, v in lexer.scan( tag.expr ) do
+        for _, _, t, v in lexer.scan( tag.expr ) do
             if t == lexer.T_EPAIR then
                 return ('unexpected symbol: %q'):format( v );
             elseif t == lexer.T_UNKNOWN then
@@ -187,7 +187,6 @@ end
 
 local function tokenConcat( token, len )
     local expr = '';
-    local i;
     
     for i = 1, len do
         expr = expr .. token[i].val;
@@ -472,7 +471,7 @@ function Generator:make( tags, len, env, commands )
         blockState = {},
         blockBreak = false,
     };
-    local idx, tag, method, err;
+    local tag, method, err;
     
     for idx = 1, len do
         tag = rawget( tags, idx );

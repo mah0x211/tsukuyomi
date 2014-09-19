@@ -51,9 +51,7 @@ local T_CURLY_CLOSE = 15;
 -- set keywords
 local KEYWORD = {};
 do
-    local i,v;
-    
-    for i, v in ipairs({
+    for _, v in ipairs({
         'break', 'goto', 'do', 'end', 'while', 'repeat', 'until', 'for', 'in', 
         'if', 'elseif', 'else', 'then', 'function', 'return', 'local', 'true', 
         'false', 'nil'
@@ -77,16 +75,14 @@ local SYMBOL_TYPE = {
     ['}'] = T_CURLY_CLOSE
 };
 do
-    local i,v;
-
     -- literal
-    for i, v in ipairs({
+    for _, v in ipairs({
         '"', '\'', '[[', ']]', '[='
     }) do
         SYMBOL_TYPE[v] = T_LITERAL;
     end
     -- operator
-    for i, v in ipairs({
+    for _, v in ipairs({
         '+', '-', '*', '/', '%', '^', ';', '..', '<', '<=', 
         '>', '>=', '=', '==', '~=', '#', 'and', 'or', 'not'
     }) do
@@ -98,16 +94,14 @@ end
 -- symbol look-ahead table
 local SYMBOL_LA = {};
 do
-    local i,v;
-    
-    for i, v in ipairs({
+    for _, v in ipairs({
         '+', '-', '*', '/', '%', '^', ',', ';', '(', ')', '{', '}', '"', '\'', 
         '#', ']'
     }) do
         SYMBOL_LA[v] = 0;
     end
     
-    for i, v in ipairs({
+    for _, v in ipairs({
         '.', '[', '<', '>', '=', '~', ':'
     }) do
         SYMBOL_LA[v] = 1;

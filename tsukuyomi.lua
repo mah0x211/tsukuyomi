@@ -115,8 +115,6 @@ Tsukuyomi:property {
 
 -- create instance
 function Tsukuyomi:init( enableSourceMap, env )
-    local cfg = protected( self );
-    
     -- check arguments
     if env ~= nil then
         assert(
@@ -255,10 +253,10 @@ end
 
 function Tsukuyomi:tostring( ... )
     local res = '';
-    local i,v,t;
+    local t;
     
     -- traverse table as array
-    for i,v in pairs({...}) do
+    for _, v in pairs({...}) do
         t = type( v );
         if t == 'string' or t == 'number' then
             res = res .. v;

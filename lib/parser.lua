@@ -55,7 +55,7 @@ local SYM_QUOT = {
 };
 
 local function findTagClose( tagClose, txt, len, cur )
-    local c, idx, head, tail;
+    local c, head, tail;
     
     -- search close bracket ?>:[0x3F][0x3E]
     while cur < len do
