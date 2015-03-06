@@ -181,7 +181,7 @@ function Tsukuyomi:setPage( label, txt )
     -- parse text
     if not err then
         -- compile
-        src, err = eval( src, self.env );
+        src, err = eval( src, self.env, '=load(tsukuyomi@' .. label .. ')' );
         -- create readable error message
         if err then
             err = errmap( label, tags, err );
