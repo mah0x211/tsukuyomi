@@ -508,7 +508,7 @@ function Generator:make( tags, len, env, commands )
     end
     
     -- compile context
-    return compile( ctx, tags, env ), ctx.insertions;
+    return compile( ctx ), ctx.insertions;
 end
 
 
