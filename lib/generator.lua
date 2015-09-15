@@ -92,7 +92,8 @@ local PRIVATE_IDEN = {
     ['_RES_']       = true,
     ['_IDX_']       = true,
     ['_DATA_']      = true,
-    ['_SETFN_']     = true
+    ['_SETFN_']     = true,
+    ['_TBLCONCAT_'] = true
 };
 local UNRESERVED_WORD = {
     ['in']      = true,
@@ -440,7 +441,7 @@ end
 local TMPL = [[local function %s( _TSUKUYOMI_, _RES_, _IDX_, _DATA_, _SETFN_ )
     %s
 %s
-    return table.concat( _RES_ );
+    return _TBLCONCAT_( _RES_ );
 end
 
 return %s;
@@ -506,6 +507,9 @@ function Generator:make( tags, len, env, commands )
     if err then
         return nil, nil, err, tag;
     end
+    
+    -- should append table.concat into env
+    env._TBLCONCAT_ = table.concat;
     
     -- compile context
     return compile( ctx ), ctx.insertions;
