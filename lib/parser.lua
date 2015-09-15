@@ -24,8 +24,7 @@
     THE SOFTWARE.
 
 --]]
-local halo = require('halo');
-local Parser = halo.class.Parser;
+local Parser = require('halo').class.Parser;
 
 
 -- find lineno and position
@@ -126,10 +125,10 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
             sym, name = txt:sub( head + 2, htail ):match( '^([%$]*)(.+)$' );
             -- no symbol
             if sym == '' then
-                rawset( tag, 'name', name );
+                tag.name = name;
             else
-                rawset( tag, 'name', 'helper' );
-                rawset( tag, 'cmd', name );
+                tag.name = 'helper';
+                tag.cmd = name;
             end
             
             token = txt:sub( htail + 1, tail - 2 );
@@ -137,7 +136,7 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
             if not token:find('^%s*$') then
                 -- expression must have space at head
                 if not token:find('^%s') then
-                    rawset( tag, 'tail', nil );
+                    tag.tail = nil;
                 else
                     -- remove \n ^%s %s$
                     tag.expr = token:gsub( '(\n*)', '' )
@@ -190,8 +189,8 @@ function Parser:init( useBraces )
             type( useBraces ) == 'boolean',
             'useBraces must be type of boolean'
         );
-        rawset( cfg, 'tagOpen', '{{[$]*[%a]+' );
-        rawset( cfg, 'tagClose', '}}' );
+        cfg.tagOpen = '{{[$]*[%a]+';
+        cfg.tagClose = '}}';
     end
     
     return self;
@@ -201,8 +200,8 @@ end
 -- read template context
 function Parser:parse( txt )
     local cfg = protected( self );
-    local tagOpen = rawget( cfg, 'tagOpen' );
-    local tagClose = rawget( cfg, 'tagClose' );
+    local tagOpen = cfg.tagOpen;
+    local tagClose = cfg.tagClose;
     local tags = {};
     local idx = 0;
     local len = string.len( txt );
@@ -217,12 +216,12 @@ function Parser:parse( txt )
             idx = idx + 1;
             -- push plain text
             if caret <= tag.head then
-                rawset( tags, idx, txtTag( txt, caret, tag.head ) );
+                tags[idx] = txtTag( txt, caret, tag.head );
                 idx = idx + 1;
             end
             
             -- insert tag
-            rawset( tags, idx, tag );
+            tags[idx] = tag;
             -- no close bracket: ?>
             if not tag.tail then
                 caret = len;
@@ -238,7 +237,7 @@ function Parser:parse( txt )
         -- push remain text
         if caret < len then
             idx = idx + 1;
-            rawset( tags, idx, txtTag( txt, caret, len ) );
+            tags[idx] = txtTag( txt, caret, len );
         end
     end
     

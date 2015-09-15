@@ -24,12 +24,15 @@
     THE SOFTWARE.
 
 --]]
-local halo = require('halo');
+
+-- modules
 local util = require('util');
 local lexer = require('tsukuyomi.lexer');
-local Generator = halo.class.Generator;
+-- constants
 local INDENT = ('%4s'):format('');
 
+-- class
+local Generator = require('halo').class.Generator;
 
 -- analyze
 local function stackPush( stack, state, t )
@@ -43,14 +46,14 @@ local function stackPush( stack, state, t )
         token = token
     };
     stack.len = stack.len + 1;
-    rawset( stack.list, stack.len, state );
+    stack.list[stack.len] = state;
     
     return state, token;
 end
 
 
 local function stackPop( stack, token, t, v )
-    local state = stack.len > 1 and rawget( stack.list, stack.len - 1 ) or nil;
+    local state = stack.len > 1 and stack.list[stack.len - 1] or nil;
     
     if not state or state.type ~= t then
         return 'unexpected symbol: ' .. v;
@@ -75,7 +78,7 @@ local function stackPop( stack, token, t, v )
         end
         
         -- remove current stack
-        rawset( stack.list, stack.len, nil );
+        stack.list[stack.len] = nil;
         stack.len = stack.len - 1;
         
         return nil, state, token, t, v;
@@ -167,15 +170,15 @@ local function analyze( ctx, tag )
             state.prev = state.type;
             state.type = t;
             token.len = token.len + 1;
-            rawset( token.list, token.len, {
+            token.list[token.len] = {
                 ['type'] = t,
                 val = v
-            });
+            };
         end
         
         -- check stack length
         if stack.len ~= 1 then
-            return ('invalid syntax: %q'):format( rawget( token.list, token.len ).val );
+            return ('invalid syntax: %q'):format( token.list[token.len].val );
         end
         
         return nil, token.list, token.len;
@@ -223,10 +226,10 @@ function Generator:if_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        rawset( ctx.blockState, #ctx.blockState + 1, tag );
+        ctx.blockState[#ctx.blockState + 1] = tag;
         appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. 
                     ' then' );
-        rawset( ctx.indent, #ctx.indent + 1, INDENT );
+        ctx.indent[#ctx.indent + 1] = INDENT;
     end
     
     return err;
@@ -238,10 +241,10 @@ function Generator:elseif_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        rawset( ctx.indent, #ctx.indent, nil );
+        ctx.indent[#ctx.indent] = nil;
         appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. 
                     ' then' );
-        rawset( ctx.indent, #ctx.indent + 1, INDENT );
+        ctx.indent[#ctx.indent + 1] = INDENT;
     end
     
     return err;
@@ -252,9 +255,9 @@ function Generator:else_( ctx, tag )
     local err = tag.expr and 'invalid arguments';
     
     if not err then
-        rawset( ctx.indent, #ctx.indent, nil );
+        ctx.indent[#ctx.indent] = nil;
         appendCode( ctx, tag.name );
-        rawset( ctx.indent, #ctx.indent + 1, INDENT );
+        ctx.indent[#ctx.indent + 1] = INDENT;
     end
     
     return err;
@@ -266,9 +269,9 @@ function Generator:do_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
     
     if not err then
-        rawset( ctx.blockState, #ctx.blockState + 1, tag );
+        ctx.blockState[#ctx.blockState + 1] = tag;
         appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. ' do' );
-        rawset( ctx.indent, #ctx.indent + 1, INDENT );
+        ctx.indent[#ctx.indent + 1] = INDENT;
     end
     
     return err;
@@ -308,8 +311,8 @@ function Generator:end_( ctx, tag )
         if #ctx.blockState < 1 then
             err = 'invalid statement';
         else
-            rawset( ctx.blockState, #ctx.blockState, nil );
-            rawset( ctx.indent, #ctx.indent, nil );
+            ctx.blockState[#ctx.blockState] = nil;
+            ctx.indent[#ctx.indent] = nil;
             ctx.blockBreak = false;
             appendCode( ctx, tag.name );
         end
@@ -446,7 +449,7 @@ return %s;
 -- compile script
 local function compile( ctx )
     local name = ('GEN%s'):format( tostring(ctx):gsub( '^table: ', '' ) );
-    local localDecl, len = util.table.keys( rawget( ctx, 'localDecl' ) );
+    local localDecl, len = util.table.keys( ctx.localDecl );
     
     -- create local variables declaration
     localDecl = len > 0 and 
@@ -474,16 +477,16 @@ function Generator:make( tags, len, env, commands )
     local tag, method, err;
     
     for idx = 1, len do
-        tag = rawget( tags, idx );
+        tag = tags[idx];
         
         -- no close bracket: ?>
-        if not rawget( tag, 'tail' ) then
+        if not tag.tail then
             err = 'could not found closed-bracket';
             break;
         end
         
         -- get handler
-        method = self[rawget( tag, 'name' ) .. '_'];
+        method = self[tag.name .. '_'];
         if not method then
             err = ('unknown expr: %q'):format( tag.name );
             break;
@@ -496,7 +499,7 @@ function Generator:make( tags, len, env, commands )
     end
     
     if not err and #ctx.blockState > 0 then
-        tag = rawget( ctx.blockState, #ctx.blockState );
+        tag = ctx.blockState[#ctx.blockState];
         err = 'end of block statement not found';
     end
     

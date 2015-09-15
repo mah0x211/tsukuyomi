@@ -25,14 +25,13 @@
 
 --]]
 -- class methods
-local halo = require('halo');
 local coNew = coroutine.create;
 local coResume = coroutine.resume;
 local eval = require('util').eval;
 local typeof = require('util.typeof');
 local Parser = require('tsukuyomi.parser');
 local Generator = require('tsukuyomi.generator');
-local Tsukuyomi = halo.class.Tsukuyomi;
+local Tsukuyomi = require('halo').class.Tsukuyomi;
 
 
 -- change nil metatable
@@ -121,9 +120,9 @@ function Tsukuyomi:init( enableSourceMap, env )
             typeof.table( env ), 
             'environment must be type of table' 
         );
-        rawset( self, 'env', env );
+        self.env = env;
     else
-        rawset( self, 'env', _G );
+        self.env = _G;
     end
     
     if enableSourceMap ~= nil then
@@ -131,11 +130,11 @@ function Tsukuyomi:init( enableSourceMap, env )
             typeof.boolean( enableSourceMap ),
             'enableSourceMap must be type of boolean' 
         );
-        rawset( self, 'enableSourceMap', enableSourceMap );
+        self.enableSourceMap = enableSourceMap;
     end
     
-    rawset( self, 'parser', Parser.new() );
-    rawset( self, 'generator', Generator.new() );
+    self.parser = Parser.new();
+    self.generator = Generator.new();
     
     return self;
 end
@@ -161,16 +160,16 @@ function Tsukuyomi:setCommand( name, fn, enableOutput )
     );
     
     -- set custom command
-    rawset( self.commands, name, {
+    self.commands[name] = {
         fn = fn,
         enableOutput = enableOutput
-    });
+    };
 end
 
 
 -- unset custom user command
 function Tsukuyomi:unsetCommand( name )
-    rawset( self.commands, name, nil );
+    self.commands[name] = nil;
 end
 
 
@@ -187,10 +186,10 @@ function Tsukuyomi:setPage( label, txt )
             err = errmap( label, tags, err );
         -- add page
         else
-            rawset( self.pages, label, {
+            self.pages[label] = {
                 script = src(),
                 srcmap = self.enableSourceMap and tags or nil
-            });
+            };
         end
     else
         err = errstr( label, tag, err ); 
@@ -206,20 +205,20 @@ function Tsukuyomi:unsetPage( label )
         'label must be type of string' 
     );
     
-    rawset( self.pages, label, nil );
+    self.pages[label] = nil;
 end
 
 
 function Tsukuyomi:render( label, data, ignoreNil )
-    local status = rawget( self, 'status' );
+    local status = self.status;
     local success, val;
     
     if type( label ) ~= 'string' then
         val = ('[label must be type of string: %q]'):format( tostring(label) );
-    elseif rawget( status, label ) ~= nil then
+    elseif status[label] ~= nil then
         val = ('[%q: circular insertion disallowed]'):format( label );
     else
-        local page = rawget( self.pages, label );
+        local page = self.pages[label];
         
         if not page then
             val = ('[template: %q not found]'):format( label );
@@ -233,9 +232,9 @@ function Tsukuyomi:render( label, data, ignoreNil )
                 ignoreNilOps( true );
             end
             
-            rawset( status, label, true );
+            status[label] = true;
             success, val = coResume( co, self, res, 1, data or {}, rawset );
-            rawset( status, label, nil );
+            status[label] = nil;
             
             -- disable ignore nil operation switch
             if ignoreNil then
