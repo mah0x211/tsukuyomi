@@ -122,7 +122,7 @@ local tmpl = tsukuyomi.new();
 
 ## Set/Unset Template
 
-### ins, err = tmpl:setPage( label, src )
+### ins, err = tmpl:setPage( label, src [, nolf] )
 
 compile the passed template strings and set the generated function to tmpl object.
 
@@ -130,6 +130,8 @@ compile the passed template strings and set the generated function to tmpl objec
 
 - label: label string for associate to the compiled template.
 - src: source strings of template.
+- nolf: eliminate a trailing line-feed of the following tags if true;  
+	`if`, `elseif`, `else`, `for`, `while`, `break`, `end`, `code`
 
 **Returns**
 
