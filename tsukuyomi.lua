@@ -182,10 +182,10 @@ function Tsukuyomi:unsetCommand( name )
 end
 
 
-function Tsukuyomi:setPage( label, txt )
-    local tags, ntag = self.parser:parse( txt );
+function Tsukuyomi:setPage( label, txt, nolf )
+    local tags, ntag = self.parser:parse( txt, nolf );
     local src, ins, err, tag = self.generator:make( tags, ntag, self.env, self.commands );
-    
+
     -- parse text
     if not err then
         -- compile

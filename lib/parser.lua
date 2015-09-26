@@ -26,6 +26,22 @@
 --]]
 local Parser = require('halo').class.Parser;
 
+local TAGNAME_SKIP = {
+    ['if'] = 2,
+    ['elseif'] = 2,
+    ['else'] = 2,
+    ['for'] = 2,
+    ['while'] = 2,
+    ['break'] = 2,
+    ['end'] = 2,
+    ['insert'] = 2,
+    ['goto'] = 2,
+    ['label'] = 2,
+    ['code'] = 2
+};
+local LF = 0xA;
+local BACKSLASH = 0x5C;
+
 
 -- find lineno and position
 local function linepos( src, head )
@@ -78,7 +94,7 @@ local function findTagClose( tagClose, txt, len, cur )
                 cur = cur + 1;
             end
         -- found quot: [", '] and not escape sequence: [\] at front
-        elseif SYM_QUOT[c] and txt:byte( cur - 1 ) ~= 0x5C then
+        elseif SYM_QUOT[c] and txt:byte( cur - 1 ) ~= BACKSLASH then
             head, tail = txt:find( '[^\\]' .. c, cur );
             -- invalid syntax
             if not head then
@@ -198,7 +214,7 @@ end
 
 
 -- read template context
-function Parser:parse( txt )
+function Parser:parse( txt, nolf )
     local cfg = protected( self );
     local tagOpen = cfg.tagOpen;
     local tagClose = cfg.tagClose;
@@ -229,7 +245,13 @@ function Parser:parse( txt )
             end
             
             -- move caret
-            caret = tag.tail + 1;
+            -- remove LF
+            if nolf == true and txt:byte( tag.tail + 1 ) == LF then
+                caret = tag.tail + ( TAGNAME_SKIP[tag.name] or 1 );
+            else
+                caret = tag.tail + 1;
+            end
+
             -- find next tag
             tag = findTag( tagOpen, tagClose, txt, len, caret );
         end
