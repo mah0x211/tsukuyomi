@@ -24,15 +24,16 @@
     THE SOFTWARE.
 
 --]]
--- class methods
+-- modules
 local coNew = coroutine.create;
 local coResume = coroutine.resume;
 local eval = require('util').eval;
 local typeof = require('util.typeof');
 local Parser = require('tsukuyomi.parser');
 local Generator = require('tsukuyomi.generator');
-local Tsukuyomi = require('halo').class.Tsukuyomi;
+local tblconcat = table.concat;
 
+-- private functions
 
 -- change nil metatable
 local function nilIdx()
@@ -46,6 +47,7 @@ end
 local function nilLen()
     return 0;
 end
+
 
 local METATBL_NIL = {
     __index = nilIdx,
@@ -61,6 +63,7 @@ local METATBL_NIL = {
     __len = nilLen
 };
 local METATBL_EMPTY = {};
+
 
 -- ignore nil operation
 local function ignoreNilOps( ignore )
@@ -103,6 +106,10 @@ local function errmap( label, srcmap, err )
 end
 
 
+-- class
+local Tsukuyomi = require('halo').class.Tsukuyomi;
+
+
 Tsukuyomi:property {
     public = {
         enableSourceMap = true,
@@ -111,6 +118,7 @@ Tsukuyomi:property {
         status = {}
     }
 };
+
 
 -- create instance
 function Tsukuyomi:init( enableSourceMap, env )
@@ -124,7 +132,7 @@ function Tsukuyomi:init( enableSourceMap, env )
     else
         self.env = _G;
     end
-    
+
     if enableSourceMap ~= nil then
         assert(
             typeof.boolean( enableSourceMap ),
@@ -132,12 +140,13 @@ function Tsukuyomi:init( enableSourceMap, env )
         );
         self.enableSourceMap = enableSourceMap;
     end
-    
+
     self.parser = Parser.new();
     self.generator = Generator.new();
     
     return self;
 end
+
 
 
 -- set custom user command
@@ -233,7 +242,7 @@ function Tsukuyomi:render( label, data, ignoreNil )
             end
             
             status[label] = true;
-            success, val = coResume( co, self, res, 1, data or {}, rawset );
+            success, val = coResume( co, self, res, 0, data or {}, tblconcat );
             status[label] = nil;
             
             -- disable ignore nil operation switch
@@ -249,6 +258,7 @@ function Tsukuyomi:render( label, data, ignoreNil )
     
     return val, success;
 end
+
 
 function Tsukuyomi:tostring( ... )
     local res = '';
