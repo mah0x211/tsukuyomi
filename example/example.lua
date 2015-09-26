@@ -58,7 +58,7 @@ local function readViewFile( tmpl, path )
             local label = path;
             local insertions;
             
-            insertions, err = tmpl:setPage( label, src );
+            insertions, err = tmpl:setPage( label, src, true );
             if not err then
                 for path in pairs( insertions ) do
                     readViewFile( tmpl, path );
