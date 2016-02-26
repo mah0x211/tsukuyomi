@@ -232,7 +232,11 @@ function Parser:parse( txt, nolf )
             idx = idx + 1;
             -- push plain text
             if caret <= tag.head then
-                tags[idx] = txtTag( txt, caret, tag.head );
+                if tag.name == 'end' and txt:byte( tag.head ) == LF then
+                   tags[idx] = txtTag( txt, caret, tag.head - 1 );
+                else
+                   tags[idx] = txtTag( txt, caret, tag.head );
+                end
                 idx = idx + 1;
             end
             
