@@ -426,7 +426,8 @@ function Generator:helper_( ctx, tag )
             -- invoke custom command
             else
                 appendCode( ctx,
-                    ('_TSUKUYOMI_.commands[%q]( %s );'):format( tag.cmd, expr )
+                    ('_TSUKUYOMI_.commands[%q].fn( %s );')
+                    :format( tag.cmd, expr )
                 );
             end
         end
