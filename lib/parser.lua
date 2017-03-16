@@ -2,19 +2,19 @@
 
     parser.lua
     Created by Masatoshi Teruya on 14/06/20.
-    
+
     Copyright 2014 Masatoshi Teruya. All rights reserved.
-    
+
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
     in the Software without restriction, including without limitation the rights
     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
     copies of the Software, and to permit persons to whom the Software is
     furnished to do so, subject to the following conditions:
-  
+
     The above copyright notice and this permission notice shall be included in
     all copies or substantial portions of the Software.
-  
+
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -50,16 +50,16 @@ local function linepos( src, head )
     local lineno = 1;
     local pos = 1;
     local tail;
-    
+
     head, tail = string.find( str, '\n', 1, true );
-    
+
     while head do
         pos = tail;
         lineno = lineno + 1;
         head, tail = string.find( str, '\n', tail + 1, true );
     end
     pos = originHead - pos;
-    
+
     return lineno, pos;
 end
 
@@ -71,7 +71,7 @@ local SYM_QUOT = {
 
 local function findTagClose( tagClose, txt, len, cur )
     local c, head, tail;
-    
+
     -- search close bracket ?>:[0x3F][0x3E]
     while cur < len do
         c = txt:sub( cur, cur );
@@ -110,7 +110,7 @@ local function findTagClose( tagClose, txt, len, cur )
             cur = cur + 1;
         end
     end
-    
+
     return nil;
 end
 
@@ -127,7 +127,7 @@ end
 local function findTag( tagOpen, tagClose, txt, len, caret )
     local head, htail = txt:find( tagOpen, caret );
     local tag, tail, token, name, sym;
-    
+
     -- found open bracket
     if head then
         tag = { head = head - 1 };
@@ -146,7 +146,7 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
                 tag.name = 'helper';
                 tag.cmd = name;
             end
-            
+
             token = txt:sub( htail + 1, tail - 2 );
             -- check expression
             if not token:find('^%s*$') then
@@ -162,7 +162,7 @@ local function findTag( tagOpen, tagClose, txt, len, caret )
             end
         end
     end
-    
+
     return tag;
 end
 
@@ -176,7 +176,7 @@ local function txtTag( txt, caret, tail )
     -- void [\n, ', \]
     local voidtxt = string.gsub( plainTxt, '[\n\'\\]', VOIDTXT_TBL );
     local lineno, pos = linepos( txt, caret );
-    
+
     return {
         head = caret,
         tail = tail,
@@ -199,7 +199,7 @@ Parser:property {
 
 function Parser:init( useBraces )
     local cfg = protected( self );
-    
+
     if useBraces then
         assert(
             type( useBraces ) == 'boolean',
@@ -208,7 +208,7 @@ function Parser:init( useBraces )
         cfg.tagOpen = '{{[$]*[%a]+';
         cfg.tagClose = '}}';
     end
-    
+
     return self;
 end
 
@@ -221,11 +221,11 @@ function Parser:parse( txt, nolf )
     local tags = {};
     local idx = 0;
     local len = string.len( txt );
-    
+
     if len > 0 then
         local caret = 1;
         local tag;
-        
+
         -- find tag
         tag = findTag( tagOpen, tagClose, txt, len, caret );
         while tag do
@@ -239,7 +239,7 @@ function Parser:parse( txt, nolf )
                 end
                 idx = idx + 1;
             end
-            
+
             -- insert tag
             tags[idx] = tag;
             -- no close bracket: ?>
@@ -247,7 +247,7 @@ function Parser:parse( txt, nolf )
                 caret = len;
                 break;
             end
-            
+
             -- move caret
             -- remove LF
             if nolf == true and txt:byte( tag.tail + 1 ) == LF then
@@ -259,14 +259,14 @@ function Parser:parse( txt, nolf )
             -- find next tag
             tag = findTag( tagOpen, tagClose, txt, len, caret );
         end
-        
+
         -- push remain text
         if caret < len then
             idx = idx + 1;
             tags[idx] = txtTag( txt, caret, len );
         end
     end
-    
+
     return tags, idx;
 end
 

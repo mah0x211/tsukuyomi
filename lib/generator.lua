@@ -2,19 +2,19 @@
 
     generator.lua
     Created by Masatoshi Teruya on 14/06/20.
-    
+
     Copyright 2014 Masatoshi Teruya. All rights reserved.
-    
+
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
     in the Software without restriction, including without limitation the rights
     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
     copies of the Software, and to permit persons to whom the Software is
     furnished to do so, subject to the following conditions:
-  
+
     The above copyright notice and this permission notice shall be included in
     all copies or substantial portions of the Software.
-  
+
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -40,32 +40,32 @@ local function stackPush( stack, state, t )
         list = {},
         len = 0
     };
-    
+
     state.type = t;
     state = {
         token = token
     };
     stack.len = stack.len + 1;
     stack.list[stack.len] = state;
-    
+
     return state, token;
 end
 
 
 local function stackPop( stack, token, t, v )
     local state = stack.len > 1 and stack.list[stack.len - 1] or nil;
-    
+
     if not state or state.type ~= t then
         return 'unexpected symbol: ' .. v;
     else
         local tmp = '';
-        
+
         -- merge current tokens
         table.foreach( token.list, function( _, item )
             tmp = tmp .. item.val;
         end);
         v = tmp .. v;
-        
+
         -- append to prev token
         token = state.token;
         if token.len > 0 then
@@ -76,11 +76,11 @@ local function stackPop( stack, token, t, v )
                 token.len = token.len - 1;
             end
         end
-        
+
         -- remove current stack
         stack.list[stack.len] = nil;
         stack.len = stack.len - 1;
-        
+
         return nil, state, token, t, v;
     end
 end
@@ -115,7 +115,7 @@ local function analyze( ctx, tag )
             len = 1
         }
         local err;
-        
+
         for _, _, t, v in lexer.scan( tag.expr ) do
             if t == lexer.T_EPAIR then
                 return ('unexpected symbol: %q'):format( v );
@@ -154,7 +154,7 @@ local function analyze( ctx, tag )
             elseif t == lexer.T_BRACKET_OPEN then
                 state, token = stackPush( stack, state, lexer.T_BRACKET_CLOSE );
             elseif t == lexer.T_PAREN_OPEN then
-                if not state.type or state.type == lexer.T_OPERATOR or 
+                if not state.type or state.type == lexer.T_OPERATOR or
                    state.type == lexer.T_VAR or state.type == lexer.T_PAREN_OPEN then
                     state, token = stackPush( stack, state, lexer.T_PAREN_CLOSE );
                 else
@@ -166,7 +166,7 @@ local function analyze( ctx, tag )
                     return err;
                 end
             end
-            
+
             state.prev = state.type;
             state.type = t;
             token.len = token.len + 1;
@@ -175,26 +175,26 @@ local function analyze( ctx, tag )
                 val = v
             };
         end
-        
+
         -- check stack length
         if stack.len ~= 1 then
             return ('invalid syntax: %q'):format( token.list[token.len].val );
         end
-        
+
         return nil, token.list, token.len;
     end
-    
+
     return ('too few arguments: %q'):format( tag.expr );
 end
 
 
 local function tokenConcat( token, len )
     local expr = '';
-    
+
     for i = 1, len do
         expr = expr .. token[i].val;
     end
-    
+
     return expr;
 end
 
@@ -217,21 +217,21 @@ end
 -- txt
 function Generator:txt_( ctx, tag )
     appendCode( ctx, resInsert( tag.expr ) );
-    
+
     return nil;
 end
 
 -- if
 function Generator:if_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         ctx.blockState[#ctx.blockState + 1] = tag;
-        appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. 
+        appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) ..
                     ' then' );
         ctx.indent[#ctx.indent + 1] = INDENT;
     end
-    
+
     return err;
 end
 
@@ -239,27 +239,27 @@ end
 -- elseif
 function Generator:elseif_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         ctx.indent[#ctx.indent] = nil;
-        appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. 
+        appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) ..
                     ' then' );
         ctx.indent[#ctx.indent + 1] = INDENT;
     end
-    
+
     return err;
 end
 
 -- else
 function Generator:else_( ctx, tag )
     local err = tag.expr and 'invalid arguments';
-    
+
     if not err then
         ctx.indent[#ctx.indent] = nil;
         appendCode( ctx, tag.name );
         ctx.indent[#ctx.indent + 1] = INDENT;
     end
-    
+
     return err;
 end
 
@@ -267,13 +267,13 @@ end
 -- do: for, while
 function Generator:do_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         ctx.blockState[#ctx.blockState + 1] = tag;
         appendCode( ctx, tag.name .. ' ' .. tokenConcat( token, len ) .. ' do' );
         ctx.indent[#ctx.indent + 1] = INDENT;
     end
-    
+
     return err;
 end
 
@@ -293,12 +293,12 @@ end
 -- break
 function Generator:break_( ctx, tag )
     local err = tag.expr and 'invalid arguments';
-    
+
     if not err then
         appendCode( ctx, tag.name .. ';' );
         ctx.blockBreak = true;
     end
-    
+
     return err;
 end
 
@@ -306,7 +306,7 @@ end
 -- end
 function Generator:end_( ctx, tag )
     local err = tag.expr and 'invalid arguments';
-    
+
     if not err then
         if #ctx.blockState < 1 then
             err = 'invalid statement';
@@ -317,7 +317,7 @@ function Generator:end_( ctx, tag )
             appendCode( ctx, tag.name );
         end
     end
-    
+
     return err;
 end
 
@@ -325,7 +325,7 @@ end
 -- goto
 function Generator:goto_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         if len ~= 1 then
             err = 'invalid arguments';
@@ -333,7 +333,7 @@ function Generator:goto_( ctx, tag )
             appendCode( ctx, tag.name .. ' ' .. token[1].val .. ';' );
         end
     end
-    
+
     return err;
 end
 
@@ -341,7 +341,7 @@ end
 -- label
 function Generator:label_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         if len ~= 1 then
             err = 'invalid arguments';
@@ -349,7 +349,7 @@ function Generator:label_( ctx, tag )
             appendCode( ctx, '::' .. token[1].val .. '::' );
         end
     end
-    
+
     return err;
 end
 
@@ -357,12 +357,12 @@ end
 -- put
 function Generator:put_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
-        appendCode( ctx, resInsert( '_TSUKUYOMI_:tostring( ' .. 
+        appendCode( ctx, resInsert( '_TSUKUYOMI_:tostring( ' ..
                     tokenConcat( token, len ) .. ' )' ) );
     end
-    
+
     return err;
 end
 
@@ -370,7 +370,7 @@ end
 -- insert
 function Generator:insert_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         if len ~= 1 then
             err = 'invalid arguments';
@@ -381,14 +381,14 @@ function Generator:insert_( ctx, tag )
             if name then
                 ctx.insertions[name] = true;
             end
-            
-            appendCode( ctx, resInsert( 
+
+            appendCode( ctx, resInsert(
                 ('(_TSUKUYOMI_:render( %s, _DATA_, false ))')
                 :format( token[1].val )
             ));
         end
     end
-    
+
     return err;
 end
 
@@ -396,11 +396,11 @@ end
 -- code
 function Generator:code_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         appendCode( ctx, tokenConcat( token, len ) .. ';' );
     end
-    
+
     return err;
 end
 
@@ -408,32 +408,32 @@ end
 -- helper command
 function Generator:helper_( ctx, tag )
     local err, token, len = analyze( ctx, tag );
-    
+
     if not err then
         local cmd = ctx.commands[tag.cmd];
-        
+
         if not cmd then
             err = ('helper command %q is not defined'):format( tag.cmd );
         else
             local expr = tokenConcat( token, len );
-            
+
             -- invoke custom command and output result
             if cmd.enableOutput then
-                appendCode( ctx, resInsert( 
+                appendCode( ctx, resInsert(
                     ('_TSUKUYOMI_:tostring( _TSUKUYOMI_.commands[%q].fn( %s ) )')
                     :format( tag.cmd, expr )
                 ));
             -- invoke custom command
             else
-                appendCode( ctx, 
+                appendCode( ctx,
                     ('_TSUKUYOMI_.commands[%q]( %s );'):format( tag.cmd, expr )
                 );
             end
         end
     end
-    
+
     return err;
-    
+
 end
 
 
@@ -450,12 +450,12 @@ return %s;
 local function compile( ctx )
     local name = ('GEN%s'):format( tostring(ctx):gsub( '^table: ', '' ) );
     local localDecl, len = util.table.keys( ctx.localDecl );
-    
+
     -- create local variables declaration
-    localDecl = len > 0 and 
+    localDecl = len > 0 and
                 ('local %s;'):format( table.concat( localDecl, ', ' ) ) or
                 '';
-    
+
     -- generate script source
     return TMPL:format( name, localDecl, table.concat( ctx.code, '\n' ), name );
 end
@@ -475,38 +475,38 @@ function Generator:make( tags, len, env, commands )
         blockBreak = false,
     };
     local tag, method, err;
-    
+
     for idx = 1, len do
         tag = tags[idx];
-        
+
         -- no close bracket: ?>
         if not tag.tail then
             err = 'could not found closed-bracket';
             break;
         end
-        
+
         -- get handler
         method = self[tag.name .. '_'];
         if not method then
             err = ('unknown expr: %q'):format( tag.name );
             break;
         end
-        
+
         err = method( self, ctx, tag );
         if err then
             break;
         end
     end
-    
+
     if not err and #ctx.blockState > 0 then
         tag = ctx.blockState[#ctx.blockState];
         err = 'end of block statement not found';
     end
-    
+
     if err then
         return nil, nil, err, tag;
     end
-    
+
     -- compile context
     return compile( ctx ), ctx.insertions;
 end

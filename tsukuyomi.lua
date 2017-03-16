@@ -2,19 +2,19 @@
 
     tsukuyomi.lua
     Created by Masatoshi Teruya on 13/11/15.
-    
+
     Copyright 2013 Masatoshi Teruya. All rights reserved.
-    
+
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
     in the Software without restriction, including without limitation the rights
     to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
     copies of the Software, and to permit persons to whom the Software is
     furnished to do so, subject to the following conditions:
-  
+
     The above copyright notice and this permission notice shall be included in
     all copies or substantial portions of the Software.
-  
+
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
     IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
     FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
@@ -77,7 +77,7 @@ end
 
 -- generate error string
 local function errstr( label, tag, msg )
-    return '[' .. label .. ':line:' .. tag.lineno .. ':' .. tag.pos .. '] ' .. 
+    return '[' .. label .. ':line:' .. tag.lineno .. ':' .. tag.pos .. '] ' ..
             ( msg or '' ) .. ( tag.token and ' ::' .. tag.token .. '::' or '' );
 end
 
@@ -86,7 +86,7 @@ end
 local function errmap( label, srcmap, err )
     -- find error position
     local idx, msg = string.match( err, ':(%d+):(.*)' );
-    
+
     if idx then
         --
         -- NOTE: should subtract 2 from line-number because code generator will
@@ -101,7 +101,7 @@ local function errmap( label, srcmap, err )
             return errstr( label, srcmap[idx], msg );
         end
     end
-    
+
     return err;
 end
 
@@ -125,8 +125,8 @@ function Tsukuyomi:init( enableSourceMap, env )
     -- check arguments
     if env ~= nil then
         assert(
-            typeof.table( env ), 
-            'environment must be type of table' 
+            typeof.table( env ),
+            'environment must be type of table'
         );
         self.env = env;
     else
@@ -136,14 +136,14 @@ function Tsukuyomi:init( enableSourceMap, env )
     if enableSourceMap ~= nil then
         assert(
             typeof.boolean( enableSourceMap ),
-            'enableSourceMap must be type of boolean' 
+            'enableSourceMap must be type of boolean'
         );
         self.enableSourceMap = enableSourceMap;
     end
 
     self.parser = Parser.new();
     self.generator = Generator.new();
-    
+
     return self;
 end
 
@@ -153,21 +153,21 @@ end
 function Tsukuyomi:setCommand( name, fn, enableOutput )
     assert(
         type( name ) == 'string',
-        'name must be type of string' 
+        'name must be type of string'
     );
     assert(
         string.len( name ) > 0,
-        'name must not be empty string' 
+        'name must not be empty string'
     );
     assert(
         type( fn ) == 'function',
-        'fn must be type of function' 
+        'fn must be type of function'
     );
     assert(
         typeof.boolean( enableOutput ),
-        'enableOutput must be type of boolean' 
+        'enableOutput must be type of boolean'
     );
-    
+
     -- set custom command
     self.commands[name] = {
         fn = fn,
@@ -201,9 +201,9 @@ function Tsukuyomi:setPage( label, txt, nolf )
             };
         end
     else
-        err = errstr( label, tag, err ); 
+        err = errstr( label, tag, err );
     end
-    
+
     return ins, err;
 end
 
@@ -211,9 +211,9 @@ end
 function Tsukuyomi:unsetPage( label )
     assert(
         typeof.string( label ),
-        'label must be type of string' 
+        'label must be type of string'
     );
-    
+
     self.pages[label] = nil;
 end
 
@@ -221,41 +221,41 @@ end
 function Tsukuyomi:render( label, data, ignoreNil )
     local status = self.status;
     local success, val;
-    
+
     if type( label ) ~= 'string' then
         val = ('[label must be type of string: %q]'):format( tostring(label) );
     elseif status[label] ~= nil then
         val = ('[%q: circular insertion disallowed]'):format( label );
     else
         local page = self.pages[label];
-        
+
         if not page then
             val = ('[template: %q not found]'):format( label );
         else
             -- invoke script by coroutine
             local res = {};
             local co = coNew( page.script );
-            
+
             -- enable ignore nil operation switch
             if ignoreNil then
                 ignoreNilOps( true );
             end
-            
+
             status[label] = true;
             success, val = coResume( co, self, res, 0, data or {}, tblconcat );
             status[label] = nil;
-            
+
             -- disable ignore nil operation switch
             if ignoreNil then
                 ignoreNilOps( false );
             end
-            
+
             if not success and page.srcmap then
                 val = errmap( label, page.srcmap, val );
             end
         end
     end
-    
+
     return val, success;
 end
 
@@ -263,7 +263,7 @@ end
 function Tsukuyomi:tostring( ... )
     local res = '';
     local t;
-    
+
     -- traverse table as array
     for _, v in pairs({...}) do
         t = type( v );
@@ -275,7 +275,7 @@ function Tsukuyomi:tostring( ... )
             res = res .. '[' .. tostring( v ) .. ']';
         end
     end
-    
+
     return res;
 end
 
